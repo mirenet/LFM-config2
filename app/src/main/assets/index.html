@@ -840,11 +840,17 @@ async function loadApp(htmlContent, fileName = ""){
     document.write(modifiedHtml);
     document.close();
 }
-
+    
 // Pokretanje pri startu aplikacije
-getSavedApp().then(saved => {
+    getSavedApp().then(saved => {
     initPreferences();
-    if(saved && saved.content){
+    
+    // PROVERA: Ako u URL-u stoji ?menu=true (zato što ga je otvorio overlayWebView), 
+    // NIKADA ne učitavaj sačuvanu aplikaciju, već uvek prikaži meni!
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('menu') === 'true') {
+        mainPopup.style.display = "flex";
+    } else if(saved && saved.content){
         loadApp(saved.content, saved.name || "");
     } else {
         mainPopup.style.display = "flex";
