@@ -150,7 +150,6 @@ public class MainActivity extends AppCompatActivity {
                 });
             }
 
-            // DODATO: Potpuno zatvaranje aplikacije na klik dugmeta "Close" kada nema sačuvane aplikacije
             @Keep
             @JavascriptInterface
             public void exitApp() {
@@ -161,7 +160,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }, "AndroidMenuBridge");
 
-        // Učitavanje menija iz assets foldera bez kašnjenja
+        // Trenutno učitavanje menija iz keša sa ispravnim asset base URL-om
         try {
             InputStream is = getAssets().open("menu.html");
             int size = is.available();
@@ -169,7 +168,7 @@ public class MainActivity extends AppCompatActivity {
             is.read(buffer);
             is.close();
             String menuHtmlContent = new String(buffer, "UTF-8");
-            overlayWebView.loadDataWithBaseURL("file:///android_asset/menu.html", menuHtmlContent, "text/html", "UTF-8", null);
+            overlayWebView.loadDataWithBaseURL("file:///android_asset/", menuHtmlContent, "text/html", "UTF-8", null);
         } catch (Exception e) {
             overlayWebView.loadUrl("file:///android_asset/menu.html?menu=true");
         }
