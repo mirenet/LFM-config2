@@ -8,9 +8,6 @@ import android.content.pm.ActivityInfo;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
-import android.view.MotionEvent;
-import android.view.View;
-import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
@@ -24,7 +21,6 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.FrameLayout;
 import androidx.annotation.Keep;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.webkit.WebSettingsCompat;
@@ -45,6 +41,7 @@ import java.util.regex.Pattern;
 
 public class MainActivity extends AppCompatActivity {
 
+    // --- DINAMIČKE PROMENLJIVE IZ appConfig.js ---
     private List<String> externalDomains = new ArrayList<>();
     private String startURL = "";
     private String broAgent = "";
@@ -54,13 +51,11 @@ public class MainActivity extends AppCompatActivity {
     private boolean forceDark = false;
 
     private WebView webView;
-    private WebView overlayWebView; 
-    private MenuControler menuControler;
-
     private ValueCallback<Uri[]> uploadMessage;
     private final static int FILE_CHOOSER_RESULT_CODE = 1;
     private DownloadHelper downloadHelper;
 
+    // Kodovi i promenljive za sistemske dozvole u hodu
     private final static int LOCATION_PERMISSION_REQUEST_CODE = 100;
     private final static int MEDIA_PERMISSION_REQUEST_CODE = 101;
     
@@ -71,8 +66,10 @@ public class MainActivity extends AppCompatActivity {
     @SuppressLint({"SetJavaScriptEnabled", "QueryPermissionsNeeded"})
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // 1. UČITAVAMO KONFIGURACIJU IZ INTERNE MEMORIJE (podržava i snimanje iz menija)
         loadConfigFromInternalStorage();
 
+        // Primena tamnog režima u zavisnosti od konfiguracije
         if (forceDark) {
             androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
                 androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
@@ -81,92 +78,21 @@ public class MainActivity extends AppCompatActivity {
 
         super.onCreate(savedInstanceState);
 
+        // 2. Primena portrait podešavanja
         if (portrait) {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         }
 
+        // 3. Primena screenOn podešavanja
         if (screenOn) {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
         
-        FrameLayout rootLayout = new FrameLayout(this);
-        rootLayout.setLayoutParams(new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT));
-
-        // 1. Donji WebView
         webView = new WebView(this);
         webView.setBackgroundColor(Color.parseColor("#070707"));
-        webView.setLayoutParams(new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT));
-        rootLayout.addView(webView);
+        setContentView(webView);
 
-        // 2. Gornji WebView (Overlay meni)
-        overlayWebView = new WebView(this);
-        overlayWebView.setLayoutParams(new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT));
-        overlayWebView.setBackgroundColor(Color.TRANSPARENT);
-        overlayWebView.getSettings().setJavaScriptEnabled(true);
-        overlayWebView.getSettings().setDomStorageEnabled(true);
-        overlayWebView.getSettings().setAllowFileAccess(true);
-        overlayWebView.getSettings().setAllowFileAccessFromFileURLs(true);
-        overlayWebView.getSettings().setAllowUniversalAccessFromFileURLs(true);
-        overlayWebView.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
-        overlayWebView.getSettings().setLoadsImagesAutomatically(true);
-        overlayWebView.setVisibility(View.GONE);
-
-        overlayWebView.setWebChromeClient(new WebChromeClient() {
-            @Override
-            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
-                if (uploadMessage != null) {
-                    uploadMessage.onReceiveValue(null);
-                    uploadMessage = null;
-                }
-
-                uploadMessage = filePathCallback;
-                Intent intent = fileChooserParams.createIntent();
-
-                try {
-                    startActivityForResult(intent, FILE_CHOOSER_RESULT_CODE);
-                } catch (Exception e) {
-                    uploadMessage = null;
-                    return false;
-                }
-
-                return true;
-            }
-        });
-
-        overlayWebView.addJavascriptInterface(new ConfigSaverInterface(this), "AndroidBridgeSaver");
-        
-        // DODATO: Omogućavanje AndroidMenuBridge-a i za overlay WebView da bi dugme Close moglo da ugasi aplikaciju
-        overlayWebView.addJavascriptInterface(new Object() {
-            @Keep
-            @JavascriptInterface
-            public void closeMenu() {
-                runOnUiThread(() -> {
-                    if (overlayWebView != null) overlayWebView.setVisibility(View.GONE);
-                });
-            }
-
-            @Keep
-            @JavascriptInterface
-            public void exitApp() {
-                runOnUiThread(() -> {
-                    finishAffinity();
-                    System.exit(0);
-                });
-            }
-        }, "AndroidMenuBridge");
-
-        overlayWebView.loadUrl("file:///android_asset/menu.html?menu=true");
-        rootLayout.addView(overlayWebView);
-
-        setContentView(rootLayout);
-
-        menuControler = new MenuControler(overlayWebView);
+        // Inicijalizujemo DownloadHelper
         downloadHelper = new DownloadHelper(this);
 
         WebSettings webSettings = webView.getSettings();
@@ -182,16 +108,19 @@ public class MainActivity extends AppCompatActivity {
         webSettings.setSupportMultipleWindows(false);
         webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
 
+        // 4. Primena allowZoom podešavanja (Standardni zoom sa dva prsta)
         webSettings.setSupportZoom(allowZoom);
         webSettings.setBuiltInZoomControls(allowZoom);
         webSettings.setDisplayZoomControls(false);
         webSettings.setLoadWithOverviewMode(true);
         webSettings.setUseWideViewPort(true);
 
+        // 5. Primena broAgent podešavanja (ako nije prazan)
         if (broAgent != null && !broAgent.trim().isEmpty()) {
             webSettings.setUserAgentString(broAgent);
         }
 
+        // 6. Najsavremeniji metod za automatsko tamno prebacivanje (Algorithmic Darkening)
         if (forceDark) {
             if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
                 WebSettingsCompat.setAlgorithmicDarkeningAllowed(webSettings, true);
@@ -202,20 +131,18 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
+        // Omogućavanje kolačića i kolačića treće strane
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
 
+        // Registrujemo DownloadHelper i ConfigSaverInterface kao JavaScript Bridge
         webView.addJavascriptInterface(downloadHelper, "AndroidBridge");
         webView.addJavascriptInterface(new ConfigSaverInterface(this), "AndroidBridgeSaver");
 
+        // Moderno upravljanje dugmetom nazad (OnBackPressedDispatcher)
         getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
-                if (menuControler != null && menuControler.isMenuVisible()) {
-                    menuControler.toggleMenu();
-                    return;
-                }
-
                 if (webView.canGoBack()) {
                     webView.goBack();
                 } else {
@@ -262,7 +189,8 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                return handleUrlLoading(view, request.getUrl().toString());
+                String url = request.getUrl().toString();
+                return handleUrlLoading(view, url);
             }
 
             @Override
@@ -340,7 +268,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                if (url != null && url.startsWith("file://") && view == webView) {
+                if (url != null && url.startsWith("file://")) {
                     view.evaluateJavascript("window.webhtml = true;", null);
                 }
             }
@@ -348,7 +276,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 String urlStr = request.getUrl().toString();
-                
+
                 if (urlStr.endsWith("appConfig.js")) {
                     try {
                         File configFile = new File(getFilesDir(), "appConfig.js");
@@ -498,20 +426,27 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        if (startURL != null && !startURL.trim().isEmpty() && !startURL.startsWith("file:///")) {
-            webView.loadUrl(startURL);
+        // 7. Pokretanje na osnovu startURL parametra iz appConfig.js ili intenta
+        Intent intent = getIntent();
+        Uri data = intent != null ? intent.getData() : null;
+
+        if (data != null) {
+            String targetUrl = data.getQueryParameter("url");
+            if (targetUrl != null && !targetUrl.isEmpty()) {
+                webView.loadUrl(targetUrl);
+            } else {
+                webView.loadUrl(data.toString());
+            }
         } else {
-            webView.loadUrl("file:///android_asset/menu.html");
+            if (startURL != null && !startURL.trim().isEmpty() && !startURL.startsWith("file:///")) {
+                webView.loadUrl(startURL);
+            } else {
+                webView.loadUrl("file:///android_asset/menu.html");
+            }
         }
     }
 
-    @Override
-    public boolean dispatchTouchEvent(MotionEvent event) {
-        if (menuControler != null && menuControler.handleTouchEvent(event)) {
-            return true;
-        }
-        return super.dispatchTouchEvent(event);
-    }
+    // --- METODE ZA ČITANJE I PARSIRANJE appConfig.js FAJLA (Sa podrškom za internu memoriju) ---
 
     private void loadConfigFromInternalStorage() {
         File configFile = new File(getFilesDir(), "appConfig.js");
@@ -558,6 +493,7 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception ignored) {}
     }
 
+    // JavaScript Bridge za čuvanje i učitavanje konfiguracije iz app menija
     @Keep
     public static class ConfigSaverInterface {
         Context mContext;
@@ -645,27 +581,6 @@ public class MainActivity extends AppCompatActivity {
                 });
             }
         }
-
-        @Keep
-        @JavascriptInterface
-        public void clearAppCacheAndData() {
-            if (mContext instanceof MainActivity) {
-                ((MainActivity) mContext).runOnUiThread(() -> {
-                    MainActivity act = (MainActivity) mContext;
-                    try {
-                        if (act.webView != null) {
-                            act.webView.clearCache(true);
-                            act.webView.clearHistory();
-                            act.webView.clearFormData();
-                            android.webkit.WebStorage.getInstance().deleteAllData();
-                        }
-                        CookieManager cookieManager = CookieManager.getInstance();
-                        cookieManager.removeAllCookies(null);
-                        cookieManager.flush();
-                    } catch (Exception ignored) {}
-                });
-            }
-        }
     }
 
     private boolean parseBoolean(String content, String key, boolean defaultValue) {
@@ -713,14 +628,12 @@ public class MainActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         if (webView != null) webView.onPause();
-        if (overlayWebView != null) overlayWebView.onPause();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         if (webView != null) webView.onResume();
-        if (overlayWebView != null) overlayWebView.onResume();
     }
 
     @Override
@@ -776,5 +689,18 @@ public class MainActivity extends AppCompatActivity {
             uploadMessage.onReceiveValue(results);
             uploadMessage = null;
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (webView != null) {
+            if (webView.getParent() instanceof android.view.ViewGroup) {
+                ((android.view.ViewGroup) webView.getParent()).removeView(webView);
+            }
+            webView.removeAllViews();
+            webView.destroy();
+            webView = null;
+        }
+        super.onDestroy();
     }
 }
