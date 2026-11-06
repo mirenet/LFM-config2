@@ -16,7 +16,6 @@
     --btn-active: #8C7F6F;
 }
 
-/* Pozadina uvek providna za overlay */
 html, body{
     margin:0;
     height:100%;
@@ -29,7 +28,6 @@ html, body{
     user-select: none;    
 }
 
-/* Popup */
 .popup{
     display: flex;
     flex-direction: column;
@@ -51,18 +49,15 @@ html, body{
     z-index: 1000;
 }
 
-/* Config: manji donji padding da dugmad budu 6px od ivice i veći textarea */
 #configModal {
     padding-bottom: 20px !important;
-    display: none; /* Inicijalno sakriven */
+    display: none;
 }
 
-/* Config: Produženo polje za tekst nadole */
 #configModal textarea {
     height: 204px !important;
 }
 
-/* Glavni Popup Header (Load Html) */
 .popup-header {
     position: relative;
     display: flex;
@@ -81,7 +76,6 @@ html, body{
     text-align: center;
 }
 
-/* Config Popup Header - mala margina od 6px ispod naslova ka textarea */
 #configModal .popup-header {
     margin-bottom: 2px !important;
     margin-top: -10px !important;
@@ -92,7 +86,6 @@ html, body{
     margin-bottom: 6px !important;
 }
 
-/* Točkić uvek u ravni sa naslovom desno */
 .settings-icon-btn {
     -webkit-tap-highlight-color: transparent;
     position: absolute;
@@ -125,7 +118,6 @@ html, body{
     fill: none;
 }
 
-/* Checkbox container */
 .checkbox-row {
     -webkit-tap-highlight-color: transparent;
     appearance: none;
@@ -151,7 +143,6 @@ html, body{
     -webkit-tap-highlight-color: transparent;
 }
 
-/* Custom Checkbox */
 .checkbox-row label input[type="checkbox"] {
     appearance: none;
     -webkit-appearance: none;
@@ -168,12 +159,10 @@ html, body{
     justify-content: center;
     transition: filter 0.15s, background-color 0.15s, border-color 0.15s;
     position: relative;
-    -webkit-tap-highlight-color: transparent;
     box-sizing: border-box;
     flex-shrink: 0;
 }
 
-/* Inside Tick */
 .checkbox-row label input[type="checkbox"]::after {
     content: "";
     width: 3px;
@@ -187,7 +176,6 @@ html, body{
     filter: brightness(0); 
 }
 
-/* Checked state */
 .checkbox-row label input[type="checkbox"]:checked {
     background-color: var(--btn-accent);
     border-color: var(--btn-accent);
@@ -197,19 +185,6 @@ html, body{
     transform: rotate(40deg) scale(1);
 }
 
-/* Checkbox - hover & click */
-@media (hover: hover) and (pointer: fine) {
-    .checkbox-row label input[type="checkbox"]:hover {
-        filter: brightness(1.25);
-    }
-}
-
-.checkbox-row label input[type="checkbox"]:active {
-    filter: brightness(1.25);
-    background-color: var(--btn-accent);
-}
-
-/* Butn. row */
 .row{
     display: flex;
     flex-wrap: wrap;
@@ -219,7 +194,6 @@ html, body{
     margin-bottom: -4px;
 }
 
-/* Butn. in popup */
 .row button{
     flex: 1 1 0;
     width: 0;
@@ -237,31 +211,16 @@ html, body{
     transition: filter 0.15s, background 0.15s;
     outline: none;
     -webkit-tap-highlight-color: transparent;
-    appearance: none;
 }
 
-/* Hover */
-@media (hover: hover) and (pointer: fine) {
-    .row button:hover{
-        filter: brightness(1.25);
-        box-shadow: 0 3px 10px rgba(0,0,0,0.3);
-    }
-}
-
-/* Click */
-.row button:active{
+.row button:hover{
     filter: brightness(1.25);
     box-shadow: 0 3px 10px rgba(0,0,0,0.3);
 }
 
-/* Mask text */
 .mask-text{
     color: #555;
     filter: brightness(0);
-}
-
-.row button:focus{
-    outline: none;
 }
 
 .hidden-file-input {
@@ -271,14 +230,13 @@ html, body{
 </head>
 <body>
 
-<!-- GLAVNI POPUP MENI -->
 <div class="popup" id="mainPopup">
     <div class="popup-header">
         <h3 id="popupTitle">Load Html</h3>
         <button id="openConfigBtn" class="settings-icon-btn" title="Edit config">
             <svg viewBox="0 0 24 24">
                 <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l-.06-.06a2 2 0 0 1 2.83 2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l-.06-.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l-.06-.06a2 2 0 0 1 2.83 2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>
             </svg>
         </button>
     </div>
@@ -298,7 +256,6 @@ html, body{
     <input type="file" id="fileInput" class="hidden-file-input" accept=".html,.htm" />
 </div>
 
-<!-- EDITOR MODAL (CONFIG) -->
 <div class="popup" id="configModal">
     <div class="popup-header">
         <h3>Config..</h3>
@@ -393,7 +350,6 @@ document.getElementById("saveConfigBtn").addEventListener("click", () => {
     }
 });
 
-// Inicijalizacija pri učitavanju menu.html-a
 initPreferences();
 
 document.getElementById("loadBtn").addEventListener("click", function(){
@@ -415,7 +371,11 @@ document.getElementById("fileInput").addEventListener("change", function(event){
             }
             await saveApp(htmlContent, file.name);
             
-            // Zatvaramo meni preko bridge-a i restartujemo aplikaciju da donji WebView učita novi fajl
+            // AUTOMATSKI BRIŠEMO startURL IZ appConfig.js KAD SE UVEZE HTML FAJL!
+            if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.clearStartUrl === 'function') {
+                window.AndroidBridgeSaver.clearStartUrl();
+            }
+
             if (window.AndroidMenuBridge && typeof window.AndroidMenuBridge.closeMenu === 'function') {
                 window.AndroidMenuBridge.closeMenu();
             }
@@ -430,7 +390,6 @@ document.getElementById("fileInput").addEventListener("change", function(event){
     }
 });
 
-// CLOSE DUGME: Zatvara meni preko Android bridge-a (sakriva gornji overlayWebView)
 document.getElementById("exitBtn").addEventListener("click", function(){
     if (window.AndroidMenuBridge && typeof window.AndroidMenuBridge.closeMenu === 'function') {
         window.AndroidMenuBridge.closeMenu();
