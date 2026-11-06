@@ -28,6 +28,15 @@ html, body{
     user-select: none;    
 }
 
+/* Sprečavamo plavi/sivi tap highlight na Androidu */
+button, input, textarea {
+    -webkit-tap-highlight-color: transparent !important;
+}
+
+button:focus, button:active, input:focus, textarea:focus {
+    outline: none !important;
+}
+
 .popup{
     display: none;
     flex-direction: column;
@@ -87,7 +96,6 @@ html, body{
 }
 
 .settings-icon-btn {
-    -webkit-tap-highlight-color: transparent;
     position: absolute;
     right: 0;
     background: none;
@@ -119,8 +127,6 @@ html, body{
 }
 
 .checkbox-row {
-    -webkit-tap-highlight-color: transparent;
-    appearance: none;
     margin: 12px 0 0px 4px;
     display: flex;
     justify-content: flex-start;
@@ -140,7 +146,6 @@ html, body{
     gap: 11px;
     user-select: none;
     text-align: left;
-    -webkit-tap-highlight-color: transparent;
 }
 
 .checkbox-row label input[type="checkbox"] {
@@ -210,16 +215,15 @@ html, body{
     margin-top: 6px;
     transition: filter 0.15s, background 0.15s;
     outline: none !important;
-    -webkit-tap-highlight-color: transparent !important;
+    appearance: none;
 }
 
-/* Potpuno uklanjamo bilo kakav trajni focus ili highlight na dugmadi */
 .row button:hover{
     filter: brightness(1.25);
     box-shadow: 0 3px 10px rgba(0,0,0,0.3);
 }
 
-.row button:focus, .row button:active {
+.row button:active, .row button:focus{
     outline: none !important;
     box-shadow: none !important;
     filter: none !important;
@@ -374,11 +378,13 @@ document.getElementById("openConfigBtn").addEventListener("click", () => {
         configTextArea.value = "// Bridge not available";
     }
     configModal.style.display = "flex";
+    setTimeout(() => document.activeElement.blur(), 10);
 });
 
 document.getElementById("closeConfigBtn").addEventListener("click", () => {
     configModal.style.display = "none";
     mainPopup.style.display = "flex";
+    setTimeout(() => document.activeElement.blur(), 10);
 });
 
 document.getElementById("saveConfigBtn").addEventListener("click", () => {
@@ -392,7 +398,7 @@ document.getElementById("saveConfigBtn").addEventListener("click", () => {
 
 initPreferences();
 
-// INICIJALIZACIJA BEZ BLESKA
+// INICIJALIZACIJA BEZ BLESKA + UKLANJANJE FOKUSA
 const urlParams = new URLSearchParams(window.location.search);
 const isMenuOverlay = urlParams.get('menu') === 'true';
 
@@ -412,8 +418,11 @@ if (!isMenuOverlay) {
     setTimeout(() => document.activeElement.blur(), 10);
 }
 
-// UNAPREĐENO DUGME "Load" (Kao iz starog koda - čisto, bez trzanja i zastoja)
+// UNAPREĐENO DUGME "Load" (sa uklanjanjem fokusa)
 document.getElementById("loadBtn").addEventListener("click", function(){
+    // Odmah skidamo fokus sa dugmeta da se ne osvetli
+    if (document.activeElement) document.activeElement.blur();
+
     let fileInput = document.createElement("input");
     fileInput.type = "file";
     fileInput.accept = ".html,.htm";
@@ -428,7 +437,6 @@ document.getElementById("loadBtn").addEventListener("click", function(){
                 const clearCheckbox = document.getElementById("clearDataCheckbox");
                 const shouldClearData = clearCheckbox && clearCheckbox.checked;
 
-                // Ako je korisnik štiklirao opciju, čistimo lokalnu memoriju i keš direktno preko JS-a bez zastoja
                 if (shouldClearData) {
                     try {
                         localStorage.clear();
@@ -445,27 +453,22 @@ document.getElementById("loadBtn").addEventListener("click", function(){
                     } catch(err) {}
                 }
 
-                // Brišemo startURL preko bridge-a
                 if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.clearStartUrl === 'function') {
                     window.AndroidBridgeSaver.clearStartUrl();
                 }
 
-                // Brišemo staru aplikaciju iz IndexedDB baze
                 await clearSavedApp();
 
-                // Čitamo novi fajl i snimamo ga
                 const reader = new FileReader();
                 reader.onload = async function(e) {
                     const htmlContent = e.target.result;
                     
                     await saveApp(htmlContent, file.name);
 
-                    // Zatvaramo meni
                     if (window.AndroidMenuBridge && typeof window.AndroidMenuBridge.closeMenu === 'function') {
                         window.AndroidMenuBridge.closeMenu();
                     }
 
-                    // Osvežavanje glavnog prikaza bez trzanja
                     if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.reloadMainApp === 'function') {
                         window.AndroidBridgeSaver.reloadMainApp();
                     } else {
@@ -483,6 +486,9 @@ document.getElementById("loadBtn").addEventListener("click", function(){
 });
 
 document.getElementById("exitBtn").addEventListener("click", function(){
+    // Uklanjamo fokus pre zatvaranja
+    if (document.activeElement) document.activeElement.blur();
+
     if (window.AndroidMenuBridge && typeof window.AndroidMenuBridge.closeMenu === 'function') {
         window.AndroidMenuBridge.closeMenu();
     } else {
