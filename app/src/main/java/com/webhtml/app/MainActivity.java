@@ -115,7 +115,6 @@ public class MainActivity extends AppCompatActivity {
         overlayWebView.getSettings().setAllowUniversalAccessFromFileURLs(true);
         overlayWebView.setVisibility(View.GONE);
 
-        // KLJUČNO: Dodat WebChromeClient za overlayWebView da bi otvorio fajl menadžer iz menija preko 6 tapa
         overlayWebView.setWebChromeClient(new WebChromeClient() {
             @Override
             public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
@@ -150,7 +149,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }, "AndroidMenuBridge");
 
-        // KLJUČNO: ?menu=true osigurava da gornji WebView uvek prepozna da je meni režim
         overlayWebView.loadUrl("file:///android_asset/menu.html?menu=true");
         rootLayout.addView(overlayWebView);
 
@@ -488,7 +486,6 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // ODREĐIVANJE ŠTA SE UČITAVA U DONJI WEBVIEW NA STARTU
         if (startURL != null && !startURL.trim().isEmpty() && !startURL.startsWith("file:///")) {
             webView.loadUrl(startURL);
         } else {
@@ -622,6 +619,42 @@ public class MainActivity extends AppCompatActivity {
                     System.exit(0);
                 }
             } catch (Exception ignored) {}
+        }
+
+        // NOVO: Glatko osvežavanje glavnog prikaza bez crnog ekrana i gašenja aktivnosti
+        @Keep
+        @JavascriptInterface
+        public void reloadMainApp() {
+            if (mContext instanceof MainActivity) {
+                ((MainActivity) mContext).runOnUiThread(() -> {
+                    MainActivity act = (MainActivity) mContext;
+                    if (act.webView != null) {
+                        act.webView.loadUrl("file:///android_asset/menu.html");
+                    }
+                });
+            }
+        }
+
+        // NOVO: Stvarno brisanje keša, kolačića i skladišta WebView-a
+        @Keep
+        @JavascriptInterface
+        public void clearAppCacheAndData() {
+            if (mContext instanceof MainActivity) {
+                ((MainActivity) mContext).runOnUiThread(() -> {
+                    MainActivity act = (MainActivity) mContext;
+                    try {
+                        if (act.webView != null) {
+                            act.webView.clearCache(true);
+                            act.webView.clearHistory();
+                            act.webView.clearFormData();
+                            android.webkit.WebStorage.getInstance().deleteAllData();
+                        }
+                        CookieManager cookieManager = CookieManager.getInstance();
+                        cookieManager.removeAllCookies(null);
+                        cookieManager.flush();
+                    } catch (Exception ignored) {}
+                });
+            }
         }
     }
 
