@@ -8,6 +8,7 @@ import android.content.pm.ActivityInfo;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.MotionEvent;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
@@ -51,11 +52,12 @@ public class MainActivity extends AppCompatActivity {
     private boolean forceDark = false;
 
     private WebView webView;
+    private MenuControler menuControler; // VRAĆENO: Kontroler za 6 tapa
+
     private ValueCallback<Uri[]> uploadMessage;
     private final static int FILE_CHOOSER_RESULT_CODE = 1;
     private DownloadHelper downloadHelper;
 
-    // Kodovi i promenljive za sistemske dozvole u hodu
     private final static int LOCATION_PERMISSION_REQUEST_CODE = 100;
     private final static int MEDIA_PERMISSION_REQUEST_CODE = 101;
     
@@ -66,10 +68,9 @@ public class MainActivity extends AppCompatActivity {
     @SuppressLint({"SetJavaScriptEnabled", "QueryPermissionsNeeded"})
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // 1. UČITAVAMO KONFIGURACIJU IZ INTERNE MEMORIJE (podržava i snimanje iz menija)
+        // 1. UČITAVAMO KONFIGURACIJU IZ INTERNE MEMORIJE
         loadConfigFromInternalStorage();
 
-        // Primena tamnog režima u zavisnosti od konfiguracije
         if (forceDark) {
             androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
                 androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
@@ -78,12 +79,10 @@ public class MainActivity extends AppCompatActivity {
 
         super.onCreate(savedInstanceState);
 
-        // 2. Primena portrait podešavanja
         if (portrait) {
             setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         }
 
-        // 3. Primena screenOn podešavanja
         if (screenOn) {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
@@ -92,8 +91,9 @@ public class MainActivity extends AppCompatActivity {
         webView.setBackgroundColor(Color.parseColor("#070707"));
         setContentView(webView);
 
-        // Inicijalizujemo DownloadHelper
+        // Inicijalizujemo DownloadHelper i MenuControler
         downloadHelper = new DownloadHelper(this);
+        menuControler = new MenuControler(webView); // VRAĆENO: Povezano na glavni WebView
 
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
@@ -108,19 +108,16 @@ public class MainActivity extends AppCompatActivity {
         webSettings.setSupportMultipleWindows(false);
         webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
 
-        // 4. Primena allowZoom podešavanja (Standardni zoom sa dva prsta)
         webSettings.setSupportZoom(allowZoom);
         webSettings.setBuiltInZoomControls(allowZoom);
         webSettings.setDisplayZoomControls(false);
         webSettings.setLoadWithOverviewMode(true);
         webSettings.setUseWideViewPort(true);
 
-        // 5. Primena broAgent podešavanja (ako nije prazan)
         if (broAgent != null && !broAgent.trim().isEmpty()) {
             webSettings.setUserAgentString(broAgent);
         }
 
-        // 6. Najsavremeniji metod za automatsko tamno prebacivanje (Algorithmic Darkening)
         if (forceDark) {
             if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
                 WebSettingsCompat.setAlgorithmicDarkeningAllowed(webSettings, true);
@@ -131,11 +128,9 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        // Omogućavanje kolačića i kolačića treće strane
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
 
-        // Registrujemo DownloadHelper i ConfigSaverInterface kao JavaScript Bridge
         webView.addJavascriptInterface(downloadHelper, "AndroidBridge");
         webView.addJavascriptInterface(new ConfigSaverInterface(this), "AndroidBridgeSaver");
 
@@ -143,6 +138,12 @@ public class MainActivity extends AppCompatActivity {
         getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
+                // Ako je meni otvoren preko 6 tapa, prvo zatvori meni
+                if (menuControler != null && menuControler.isMenuVisible()) {
+                    menuControler.toggleMenu();
+                    return;
+                }
+
                 if (webView.canGoBack()) {
                     webView.goBack();
                 } else {
@@ -446,7 +447,14 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // --- METODE ZA ČITANJE I PARSIRANJE appConfig.js FAJLA (Sa podrškom za internu memoriju) ---
+    // VRAĆENO: HVATANJE DODIRA ZA 6 TAPA (MenuControler)
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        if (menuControler != null && menuControler.handleTouchEvent(event)) {
+            return true;
+        }
+        return super.dispatchTouchEvent(event);
+    }
 
     private void loadConfigFromInternalStorage() {
         File configFile = new File(getFilesDir(), "appConfig.js");
@@ -493,7 +501,6 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception ignored) {}
     }
 
-    // JavaScript Bridge za čuvanje i učitavanje konfiguracije iz app menija
     @Keep
     public static class ConfigSaverInterface {
         Context mContext;
