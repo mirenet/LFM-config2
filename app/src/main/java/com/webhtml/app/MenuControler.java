@@ -14,7 +14,7 @@ public class MenuControler {
         this.overlayWebView = overlayWebView;
     }
 
-    // Metoda za detekciju 6 tapa (ili bilo kog drugog gesta)
+    // Metoda za detekciju 6 tapa bilo gde na ekranu
     public boolean handleTouchEvent(MotionEvent event) {
         if (event.getAction() == MotionEvent.ACTION_DOWN) {
             long currentTime = System.currentTimeMillis();
@@ -42,6 +42,12 @@ public class MenuControler {
             } else {
                 overlayWebView.setVisibility(View.VISIBLE);
             }
+        }
+    }
+
+    public void closeMenu() {
+        if (overlayWebView != null) {
+            overlayWebView.setVisibility(View.GONE);
         }
     }
 
