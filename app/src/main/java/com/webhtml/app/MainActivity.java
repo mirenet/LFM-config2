@@ -8,6 +8,9 @@ import android.content.pm.ActivityInfo;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
@@ -21,6 +24,7 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 import androidx.annotation.Keep;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.webkit.WebSettingsCompat;
@@ -50,6 +54,12 @@ public class MainActivity extends AppCompatActivity {
     private boolean forceDark = false;
 
     private WebView webView;
+    private WebView overlayWebView; // Gornji WebView za meni preko živog sajta
+
+    // Za detekciju 6 tapa
+    private int tapCount = 0;
+    private long lastTapTime = 0;
+
     private ValueCallback<Uri[]> uploadMessage;
     private final static int FILE_CHOOSER_RESULT_CODE = 1;
     private DownloadHelper downloadHelper;
@@ -83,9 +93,44 @@ public class MainActivity extends AppCompatActivity {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
         
+        // --- KREIRANJE KONTEJNERA SA DVA WEBVIEW-a ---
+        FrameLayout rootLayout = new FrameLayout(this);
+        rootLayout.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+
+        // 1. Donji WebView (Za živi sajt ili uvezene HTML fajlove)
         webView = new WebView(this);
         webView.setBackgroundColor(Color.parseColor("#070707"));
-        setContentView(webView);
+        webView.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        rootLayout.addView(webView);
+
+        // 2. Gornji WebView (Samo za živi sajt - učitava tvoj index.html kao providni meni preko sajta)
+        overlayWebView = new WebView(this);
+        overlayWebView.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        overlayWebView.setBackgroundColor(Color.TRANSPARENT); // Providna pozadina
+        overlayWebView.getSettings().setJavaScriptEnabled(true);
+        overlayWebView.getSettings().setDomStorageEnabled(true);
+        overlayWebView.getSettings().setAllowFileAccess(true);
+        overlayWebView.getSettings().setAllowFileAccessFromFileURLs(true);
+        overlayWebView.getSettings().setAllowUniversalAccessFromFileURLs(true);
+        overlayWebView.setVisibility(View.GONE); // Inicijalno sakriven
+        
+        // Registracija JavaScript bridge-eva i na gornjem WebView-u da bi Config i Load radili
+        overlayWebView.addJavascriptInterface(new ConfigSaverInterface(this), "AndroidBridgeSaver");
+        
+        // Učitavamo tvoj index.html u gornji sloj
+        overlayWebView.loadUrl("file:///android_asset/index.html");
+        
+        rootLayout.addView(overlayWebView);
+
+        // Postavljamo root kontejner na ekran
+        setContentView(rootLayout);
+        // ---------------------------------------------
 
         downloadHelper = new DownloadHelper(this);
 
@@ -117,7 +162,6 @@ public class MainActivity extends AppCompatActivity {
                 WebSettingsCompat.setAlgorithmicDarkeningAllowed(webSettings, true);
             } else if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
                 @SuppressWarnings("deprecation")
-                boolean fallback = true;
                 WebSettingsCompat.setForceDark(webSettings, WebSettingsCompat.FORCE_DARK_ON);
             }
         }
@@ -125,13 +169,19 @@ public class MainActivity extends AppCompatActivity {
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
 
-        // Registracija JavaScript bridge-eva
+        // Registracija JavaScript bridge-eva za glavni WebView
         webView.addJavascriptInterface(downloadHelper, "AndroidBridge");
         webView.addJavascriptInterface(new ConfigSaverInterface(this), "AndroidBridgeSaver");
 
         getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
+                // Ako je gornji meni otvoren, zatvori ga na Back taster
+                if (overlayWebView != null && overlayWebView.getVisibility() == View.VISIBLE) {
+                    overlayWebView.setVisibility(View.GONE);
+                    return;
+                }
+
                 if (webView.canGoBack()) {
                     webView.goBack();
                 } else {
@@ -256,8 +306,10 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                if (url != null && url.startsWith("file://")) {
-                    view.evaluateJavascript("window.webhtml = true;", null);
+                // INJEKCIJA RADI SAMO AKO JE UVEZENI HTML FAJL (file://), A NE ŽIVI SAJT!
+                if (url != null && url.startsWith("file://") && view == webView) {
+                    // Ovde ide tvoja stara skripta za injekciju u uvozni HTML
+                    injectLocalAppScript(view);
                 }
             }
             
@@ -414,12 +466,56 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        // PROVERA: Ako je definisan startURL (živi sajt), učitavamo ga u donji WebView,
+        // a gornji WebView čeka 6 tapa da prikaže lokalni meni.
+        // Ako nema startURL-a, učitavamo lokalni index.html normalno u donji WebView.
         if (startURL != null && !startURL.trim().isEmpty() && !startURL.startsWith("file:///")) {
             webView.loadUrl(startURL);
         } else {
             webView.loadUrl("file:///android_asset/index.html");
         }
     }
+
+    // Pomoćna metoda za staru injekciju skripte SAMO u uvezene lokalne fajlove
+    private void injectLocalAppScript(WebView view) {
+        // Ovde ide tvoja originalna skripta/logika za ubacivanje menija u uvozni HTML
+        view.evaluateJavascript("window.webhtml = true;", null);
+    }
+
+    // --- DETEKCIJA 6 TAPA BILO GDE NA EKRANU (Radi samo za žive sajtove) ---
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        // Reagujemo samo ako je aktivan živi sajt (startURL) i ako je gornji overlay kreiran
+        if (startURL != null && !startURL.trim().isEmpty() && !startURL.startsWith("file:///")) {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                long currentTime = System.currentTimeMillis();
+                
+                if (currentTime - lastTapTime > 500) {
+                    tapCount = 0;
+                }
+
+                lastTapTime = currentTime;
+                tapCount++;
+
+                if (tapCount >= 6) {
+                    tapCount = 0;
+                    toggleOverlayMenu();
+                }
+            }
+        }
+        return super.dispatchTouchEvent(event);
+    }
+
+    private void toggleOverlayMenu() {
+        if (overlayWebView != null) {
+            if (overlayWebView.getVisibility() == View.VISIBLE) {
+                overlayWebView.setVisibility(View.GONE);
+            } else {
+                overlayWebView.setVisibility(View.VISIBLE);
+            }
+        }
+    }
+    // ---------------------------------------------------------------------
 
     private void loadConfigFromInternalStorage() {
         File configFile = new File(getFilesDir(), "appConfig.js");
@@ -566,12 +662,14 @@ public class MainActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         if (webView != null) webView.onPause();
+        if (overlayWebView != null) overlayWebView.onPause();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         if (webView != null) webView.onResume();
+        if (overlayWebView != null) overlayWebView.onResume();
     }
 
     @Override
@@ -624,12 +722,14 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         if (webView != null) {
-            if (webView.getParent() instanceof android.view.ViewGroup) {
-                ((android.view.ViewGroup) webView.getParent()).removeView(webView);
-            }
             webView.removeAllViews();
             webView.destroy();
             webView = null;
+        }
+        if (overlayWebView != null) {
+            overlayWebView.removeAllViews();
+            overlayWebView.destroy();
+            overlayWebView = null;
         }
         super.onDestroy();
     }
