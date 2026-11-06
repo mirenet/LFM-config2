@@ -102,7 +102,7 @@ public class MainActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT));
         rootLayout.addView(webView);
 
-        // 2. Gornji WebView (Učitava menu.html OBAVEZNO sa ?menu=true parametrom)
+        // 2. Gornji WebView (Učitava menu.html OBAVEZNO sa ?menu=true parametrom i optimizovan za trenutni prikaz)
         overlayWebView = new WebView(this);
         overlayWebView.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -113,6 +113,8 @@ public class MainActivity extends AppCompatActivity {
         overlayWebView.getSettings().setAllowFileAccess(true);
         overlayWebView.getSettings().setAllowFileAccessFromFileURLs(true);
         overlayWebView.getSettings().setAllowUniversalAccessFromFileURLs(true);
+        overlayWebView.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
+        overlayWebView.getSettings().setLoadsImagesAutomatically(true);
         overlayWebView.setVisibility(View.GONE);
 
         overlayWebView.setWebChromeClient(new WebChromeClient() {
@@ -621,7 +623,6 @@ public class MainActivity extends AppCompatActivity {
             } catch (Exception ignored) {}
         }
 
-        // NOVO: Glatko osvežavanje glavnog prikaza bez crnog ekrana i gašenja aktivnosti
         @Keep
         @JavascriptInterface
         public void reloadMainApp() {
@@ -635,7 +636,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        // NOVO: Stvarno brisanje keša, kolačića i skladišta WebView-a
         @Keep
         @JavascriptInterface
         public void clearAppCacheAndData() {
@@ -749,35 +749,22 @@ public class MainActivity extends AppCompatActivity {
         if (requestCode == FILE_CHOOSER_RESULT_CODE) {
             if (uploadMessage == null) return;
             Uri[] results = null;
-            if (resultCode == Activity.RESULT_OK && intent != null) {
-                String dataString = intent.getDataString();
-                if (dataString != null) {
-                    results = new Uri[]{Uri.parse(dataString)};
+            if (resultCode == Activity.RESULT_OK) {
+                if (intent != null) {
+                    String dataString = intent.getDataString();
+                    if (dataString != null) {
+                        results = new Uri[]{Uri.parse(dataString)};
+                    } else if (intent.getClipData() != null) {
+                        int count = intent.getClipData().getItemCount();
+                        results = new Uri[count];
+                        for (int i = 0; i < count; i++) {
+                            results[i] = intent.getClipData().getItemAt(i).getUri();
+                        }
+                    }
                 }
             }
             uploadMessage.onReceiveValue(results);
             uploadMessage = null;
         }
-    }
-
-    @Override
-    protected void onDestroy() {
-        if (webView != null) {
-            if (webView.getParent() instanceof android.view.ViewGroup) {
-                ((android.view.ViewGroup) webView.getParent()).removeView(webView);
-            }
-            webView.removeAllViews();
-            webView.destroy();
-            webView = null;
-        }
-        if (overlayWebView != null) {
-            if (overlayWebView.getParent() instanceof android.view.ViewGroup) {
-                ((android.view.ViewGroup) overlayWebView.getParent()).removeView(overlayWebView);
-            }
-            overlayWebView.removeAllViews();
-            overlayWebView.destroy();
-            overlayWebView = null;
-        }
-        super.onDestroy();
     }
 }
