@@ -213,9 +213,11 @@ html, body{
     -webkit-tap-highlight-color: transparent;
 }
 
-.row button:hover{
+/* Sprečavamo da dugme zadrži svetli efekat fokusa bez prelaza mišem/dodira */
+.row button:hover, .row button:focus{
     filter: brightness(1.25);
     box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+    outline: none;
 }
 
 .mask-text{
@@ -396,13 +398,16 @@ if (!isMenuOverlay) {
             document.close();
         } else {
             mainPopup.style.display = "flex";
+            // Uklanjamo automatski fokus sa dugmadi pri otvaranju
+            setTimeout(() => document.activeElement.blur(), 50);
         }
     });
 } else {
     mainPopup.style.display = "flex";
+    setTimeout(() => document.activeElement.blur(), 50);
 }
 
-// UNAPREĐENO DUGME "Load" (Bez crnog ekrana, sa ispravnim brisanjem keša)
+// UNAPREĐENO DUGME "Load" (Sa sinhronizovanim brisanjem keša da radi iz prve)
 document.getElementById("loadBtn").addEventListener("click", function(){
     let fileInput = document.createElement("input");
     fileInput.type = "file";
@@ -428,10 +433,12 @@ document.getElementById("loadBtn").addEventListener("click", function(){
                     }
                 }
 
-                // Brisanje prave keš memorije aplikacije preko nove Java metode ako je potrebno
+                // Brisanje keša sa malom pauzom da se operacija u Androidu završi pre učitavanja novog fajla
                 if (isLiveSite || userWantsClear) {
                     if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.clearAppCacheAndData === 'function') {
                         window.AndroidBridgeSaver.clearAppCacheAndData();
+                        // Kratka pauza da WebView sinhronizuje brisanje pre nastavka
+                        await new Promise(resolve => setTimeout(resolve, 250));
                     }
                 }
 
@@ -455,7 +462,7 @@ document.getElementById("loadBtn").addEventListener("click", function(){
                         window.AndroidMenuBridge.closeMenu();
                     }
 
-                    // GLATKO OSVEŽAVANJE BEZ CRNOG EKRANA (Umesto restartApp)
+                    // Osvežavanje glavnog prikaza
                     if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.reloadMainApp === 'function') {
                         window.AndroidBridgeSaver.reloadMainApp();
                     } else {
