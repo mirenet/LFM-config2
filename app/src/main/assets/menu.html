@@ -230,13 +230,14 @@ html, body{
 </head>
 <body>
 
+<!-- GLAVNI MENI POPUP -->
 <div class="popup" id="mainPopup">
     <div class="popup-header">
         <h3 id="popupTitle">Load Html</h3>
         <button id="openConfigBtn" class="settings-icon-btn" title="Edit config">
             <svg viewBox="0 0 24 24">
                 <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l-.06-.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l-.06-.06a2 2 0 0 1 2.83 2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l-.06-.06a2 2 0 0 1 2.83 2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>
             </svg>
         </button>
     </div>
@@ -256,6 +257,7 @@ html, body{
     <input type="file" id="fileInput" class="hidden-file-input" accept=".html,.htm" />
 </div>
 
+<!-- EDITOR MODAL (CONFIG) -->
 <div class="popup" id="configModal">
     <div class="popup-header">
         <h3>Config..</h3>
@@ -290,6 +292,27 @@ async function saveApp(htmlContent, fileName = "app.html"){
         store.put(htmlContent, "userApp");
         store.put(fileName, "userAppName");
         tx.oncomplete = () => resolve();
+    });
+}
+
+async function getSavedApp(){
+    const db = await openDB();
+    return new Promise(resolve => {
+        const tx = db.transaction(STORE_NAME, "readonly");
+        const store = tx.objectStore(STORE_NAME);
+        const reqApp = store.get("userApp");
+        const reqName = store.get("userAppName");
+        
+        let result = {};
+        reqApp.onsuccess = () => {
+            result.content = reqApp.result;
+            if (result.content !== undefined && result.name !== undefined) resolve(result);
+        };
+        reqName.onsuccess = () => {
+            result.name = reqName.result;
+            if (result.content !== undefined && result.name !== undefined) resolve(result);
+        };
+        setTimeout(() => resolve(null), 350);
     });
 }
 
@@ -352,6 +375,22 @@ document.getElementById("saveConfigBtn").addEventListener("click", () => {
 
 initPreferences();
 
+// PROVERA NA STARTU: Ako postoji sačuvana aplikacija, odmah je prikaži (zameni sadržaj stranice sa sačuvanom app)
+getSavedApp().then(saved => {
+    const urlParams = new URLSearchParams(window.location.search);
+    // Ako je ovo otvoren overlay meni preko ?menu=true, uvek prikaži meni
+    if (urlParams.get('menu') === 'true') {
+        mainPopup.style.display = "flex";
+    } else if (saved && saved.content) {
+        // Zamenjujemo sadržaj menu.html sačuvanom aplikacijom!
+        document.open();
+        document.write(saved.content);
+        document.close();
+    } else {
+        mainPopup.style.display = "flex";
+    }
+});
+
 document.getElementById("loadBtn").addEventListener("click", function(){
     document.getElementById("fileInput").click();
 });
@@ -376,6 +415,7 @@ document.getElementById("fileInput").addEventListener("change", function(event){
                 window.AndroidBridgeSaver.clearStartUrl();
             }
 
+            // Zatvaramo meni preko bridge-a ako je u overlay modu, ili radimo reload
             if (window.AndroidMenuBridge && typeof window.AndroidMenuBridge.closeMenu === 'function') {
                 window.AndroidMenuBridge.closeMenu();
             }
