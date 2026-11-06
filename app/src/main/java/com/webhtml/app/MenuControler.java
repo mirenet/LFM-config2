@@ -13,7 +13,7 @@ public class MenuControler {
     private final WebView overlayWebView;
     
     // Dozvoljeno vreme između tapova (u milisekundama)
-    private static final long TAP_TIMEOUT = 450;
+    private static final long TAP_TIMEOUT = 250;
     // Maksimalno dozvoljeno rastojanje u pikselima između uzastopnih tapova (da bi se računalo da je "isto mesto")
     private static final float MAX_DISTANCE_PX = 80.0f; 
     // Dozvoljeno pomeranje prsta unutar istog tapa (da se spreči skrolovanje)
