@@ -330,6 +330,7 @@ public class MainActivity extends AppCompatActivity {
                 super.onPageFinished(view, url);
                 if (url != null && url.startsWith("file://") && view == webView) {
                     view.evaluateJavascript("window.webhtml = true;", null);
+                    view.clearHistory();
                 }
             }
             
