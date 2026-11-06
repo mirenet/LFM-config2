@@ -54,11 +54,8 @@ public class MainActivity extends AppCompatActivity {
     private boolean forceDark = false;
 
     private WebView webView;
-    private WebView overlayWebView; // Gornji WebView za meni preko živog sajta
-
-    // Za detekciju 6 tapa
-    private int tapCount = 0;
-    private long lastTapTime = 0;
+    private WebView overlayWebView; // Gornji WebView za menu.html
+    private MenuControler menuControler;
 
     private ValueCallback<Uri[]> uploadMessage;
     private final static int FILE_CHOOSER_RESULT_CODE = 1;
@@ -74,7 +71,6 @@ public class MainActivity extends AppCompatActivity {
     @SuppressLint({"SetJavaScriptEnabled", "QueryPermissionsNeeded"})
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // 1. Provera, kopiranje i čitanje konfiguracije iz internog skladišta
         loadConfigFromInternalStorage();
 
         if (forceDark) {
@@ -99,7 +95,7 @@ public class MainActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
-        // 1. Donji WebView (Za živi sajt ili uvezene HTML fajlove)
+        // 1. Donji WebView (Za živi sajt ili uvezene HTML aplikacije)
         webView = new WebView(this);
         webView.setBackgroundColor(Color.parseColor("#070707"));
         webView.setLayoutParams(new FrameLayout.LayoutParams(
@@ -107,25 +103,40 @@ public class MainActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT));
         rootLayout.addView(webView);
 
-        // 2. Gornji WebView (Samo za živi sajt - učitava index.html sa ?menu=true)
+        // 2. Gornji WebView (Učitava menu.html kao providni overlay meni preko ekrana)
         overlayWebView = new WebView(this);
         overlayWebView.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
-        overlayWebView.setBackgroundColor(Color.TRANSPARENT); // Providna pozadina
+        overlayWebView.setBackgroundColor(Color.TRANSPARENT);
         overlayWebView.getSettings().setJavaScriptEnabled(true);
         overlayWebView.getSettings().setDomStorageEnabled(true);
         overlayWebView.getSettings().setAllowFileAccess(true);
         overlayWebView.getSettings().setAllowFileAccessFromFileURLs(true);
         overlayWebView.getSettings().setAllowUniversalAccessFromFileURLs(true);
-        overlayWebView.setVisibility(View.GONE); // Inicijalno sakriven
+        overlayWebView.setVisibility(View.GONE);
 
         overlayWebView.addJavascriptInterface(new ConfigSaverInterface(this), "AndroidBridgeSaver");
-        overlayWebView.loadUrl("file:///android_asset/index.html?menu=true");
+        
+        // Bridge za zatvaranje menija iz samog menu.html fajla na dugme "Close"
+        overlayWebView.addJavascriptInterface(new Object() {
+            @Keep
+            @JavascriptInterface
+            public void closeMenu() {
+                runOnUiThread(() -> {
+                    if (overlayWebView != null) overlayWebView.setVisibility(View.GONE);
+                });
+            }
+        }, "AndroidMenuBridge");
+
+        overlayWebView.loadUrl("file:///android_asset/menu.html");
         rootLayout.addView(overlayWebView);
 
         setContentView(rootLayout);
         // -------------------------------------------------------------
+
+        // Inicijalizujemo MenuControler za hvatanje 6 tapa
+        menuControler = new MenuControler(overlayWebView);
 
         downloadHelper = new DownloadHelper(this);
 
@@ -152,7 +163,7 @@ public class MainActivity extends AppCompatActivity {
             webSettings.setUserAgentString(broAgent);
         }
 
-        // Tvoj originalni kod za forceDark bez ikakvih izmena i grešaka
+        // Tvoj originalni kod za forceDark bez ikakvih izmena
         if (forceDark) {
             if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
                 WebSettingsCompat.setAlgorithmicDarkeningAllowed(webSettings, true);
@@ -166,16 +177,15 @@ public class MainActivity extends AppCompatActivity {
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
 
-        // Registracija JavaScript bridge-eva
         webView.addJavascriptInterface(downloadHelper, "AndroidBridge");
         webView.addJavascriptInterface(new ConfigSaverInterface(this), "AndroidBridgeSaver");
 
         getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
-                // Ako je gornji meni otvoren, zatvori ga na Back taster
-                if (overlayWebView != null && overlayWebView.getVisibility() == View.VISIBLE) {
-                    overlayWebView.setVisibility(View.GONE);
+                // Ako je meni otvoren, Back taster zatvara meni
+                if (menuControler != null && menuControler.isMenuVisible()) {
+                    menuControler.toggleMenu();
                     return;
                 }
 
@@ -464,43 +474,18 @@ public class MainActivity extends AppCompatActivity {
         if (startURL != null && !startURL.trim().isEmpty() && !startURL.startsWith("file:///")) {
             webView.loadUrl(startURL);
         } else {
-            webView.loadUrl("file:///android_asset/index.html");
+            webView.loadUrl("file:///android_asset/menu.html");
         }
     }
 
-    // --- DETEKCIJA 6 TAPA ZA MENI ---
+    // Prosledjujemo touch dogadjaje u MenuControler da izbroji 6 tapa i otvori/zatvori meni
     @Override
     public boolean dispatchTouchEvent(MotionEvent event) {
-        if (startURL != null && !startURL.trim().isEmpty() && !startURL.startsWith("file:///")) {
-            if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                long currentTime = System.currentTimeMillis();
-                
-                if (currentTime - lastTapTime > 500) {
-                    tapCount = 0;
-                }
-
-                lastTapTime = currentTime;
-                tapCount++;
-
-                if (tapCount >= 6) {
-                    tapCount = 0;
-                    toggleOverlayMenu();
-                }
-            }
+        if (menuControler != null && menuControler.handleTouchEvent(event)) {
+            return true;
         }
         return super.dispatchTouchEvent(event);
     }
-
-    private void toggleOverlayMenu() {
-        if (overlayWebView != null) {
-            if (overlayWebView.getVisibility() == View.VISIBLE) {
-                overlayWebView.setVisibility(View.GONE);
-            } else {
-                overlayWebView.setVisibility(View.VISIBLE);
-            }
-        }
-    }
-    // --------------------------------
 
     private void loadConfigFromInternalStorage() {
         File configFile = new File(getFilesDir(), "appConfig.js");
