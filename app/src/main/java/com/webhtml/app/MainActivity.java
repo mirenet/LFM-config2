@@ -9,6 +9,8 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
@@ -22,6 +24,7 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 import androidx.annotation.Keep;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.webkit.WebSettingsCompat;
@@ -42,7 +45,6 @@ import java.util.regex.Pattern;
 
 public class MainActivity extends AppCompatActivity {
 
-    // --- DINAMIČKE PROMENLJIVE IZ appConfig.js ---
     private List<String> externalDomains = new ArrayList<>();
     private String startURL = "";
     private String broAgent = "";
@@ -52,7 +54,8 @@ public class MainActivity extends AppCompatActivity {
     private boolean forceDark = false;
 
     private WebView webView;
-    private MenuControler menuControler; // VRAĆENO: Kontroler za 6 tapa
+    private WebView overlayWebView; 
+    private MenuControler menuControler;
 
     private ValueCallback<Uri[]> uploadMessage;
     private final static int FILE_CHOOSER_RESULT_CODE = 1;
@@ -68,7 +71,6 @@ public class MainActivity extends AppCompatActivity {
     @SuppressLint({"SetJavaScriptEnabled", "QueryPermissionsNeeded"})
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // 1. UČITAVAMO KONFIGURACIJU IZ INTERNE MEMORIJE
         loadConfigFromInternalStorage();
 
         if (forceDark) {
@@ -87,13 +89,73 @@ public class MainActivity extends AppCompatActivity {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
         
+        FrameLayout rootLayout = new FrameLayout(this);
+        rootLayout.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+
+        // 1. Donji WebView
         webView = new WebView(this);
         webView.setBackgroundColor(Color.parseColor("#070707"));
-        setContentView(webView);
+        webView.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        rootLayout.addView(webView);
 
-        // Inicijalizujemo DownloadHelper i MenuControler
+        // 2. Gornji WebView (Učitava menu.html OBAVEZNO sa ?menu=true parametrom)
+        overlayWebView = new WebView(this);
+        overlayWebView.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        overlayWebView.setBackgroundColor(Color.TRANSPARENT);
+        overlayWebView.getSettings().setJavaScriptEnabled(true);
+        overlayWebView.getSettings().setDomStorageEnabled(true);
+        overlayWebView.getSettings().setAllowFileAccess(true);
+        overlayWebView.getSettings().setAllowFileAccessFromFileURLs(true);
+        overlayWebView.getSettings().setAllowUniversalAccessFromFileURLs(true);
+        overlayWebView.setVisibility(View.GONE);
+
+        overlayWebView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
+                if (uploadMessage != null) {
+                    uploadMessage.onReceiveValue(null);
+                    uploadMessage = null;
+                }
+
+                uploadMessage = filePathCallback;
+                Intent intent = fileChooserParams.createIntent();
+
+                try {
+                    startActivityForResult(intent, FILE_CHOOSER_RESULT_CODE);
+                } catch (Exception e) {
+                    uploadMessage = null;
+                    return false;
+                }
+
+                return true;
+            }
+        });
+
+        overlayWebView.addJavascriptInterface(new ConfigSaverInterface(this), "AndroidBridgeSaver");
+        
+        overlayWebView.addJavascriptInterface(new Object() {
+            @Keep
+            @JavascriptInterface
+            public void closeMenu() {
+                runOnUiThread(() -> {
+                    if (overlayWebView != null) overlayWebView.setVisibility(View.GONE);
+                });
+            }
+        }, "AndroidMenuBridge");
+
+        overlayWebView.loadUrl("file:///android_asset/menu.html?menu=true");
+        rootLayout.addView(overlayWebView);
+
+        setContentView(rootLayout);
+
+        menuControler = new MenuControler(overlayWebView);
         downloadHelper = new DownloadHelper(this);
-        menuControler = new MenuControler(webView); // VRAĆENO: Povezano na glavni WebView
 
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
@@ -134,11 +196,9 @@ public class MainActivity extends AppCompatActivity {
         webView.addJavascriptInterface(downloadHelper, "AndroidBridge");
         webView.addJavascriptInterface(new ConfigSaverInterface(this), "AndroidBridgeSaver");
 
-        // Moderno upravljanje dugmetom nazad (OnBackPressedDispatcher)
         getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
-                // Ako je meni otvoren preko 6 tapa, prvo zatvori meni
                 if (menuControler != null && menuControler.isMenuVisible()) {
                     menuControler.toggleMenu();
                     return;
@@ -190,8 +250,7 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                String url = request.getUrl().toString();
-                return handleUrlLoading(view, url);
+                return handleUrlLoading(view, request.getUrl().toString());
             }
 
             @Override
@@ -269,7 +328,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                if (url != null && url.startsWith("file://")) {
+                if (url != null && url.startsWith("file://") && view == webView) {
                     view.evaluateJavascript("window.webhtml = true;", null);
                 }
             }
@@ -277,7 +336,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 String urlStr = request.getUrl().toString();
-
+                
                 if (urlStr.endsWith("appConfig.js")) {
                     try {
                         File configFile = new File(getFilesDir(), "appConfig.js");
@@ -427,27 +486,13 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // 7. Pokretanje na osnovu startURL parametra iz appConfig.js ili intenta
-        Intent intent = getIntent();
-        Uri data = intent != null ? intent.getData() : null;
-
-        if (data != null) {
-            String targetUrl = data.getQueryParameter("url");
-            if (targetUrl != null && !targetUrl.isEmpty()) {
-                webView.loadUrl(targetUrl);
-            } else {
-                webView.loadUrl(data.toString());
-            }
+        if (startURL != null && !startURL.trim().isEmpty() && !startURL.startsWith("file:///")) {
+            webView.loadUrl(startURL);
         } else {
-            if (startURL != null && !startURL.trim().isEmpty() && !startURL.startsWith("file:///")) {
-                webView.loadUrl(startURL);
-            } else {
-                webView.loadUrl("file:///android_asset/menu.html");
-            }
+            webView.loadUrl("file:///android_asset/menu.html");
         }
     }
 
-    // VRAĆENO: HVATANJE DODIRA ZA 6 TAPA (MenuControler)
     @Override
     public boolean dispatchTouchEvent(MotionEvent event) {
         if (menuControler != null && menuControler.handleTouchEvent(event)) {
@@ -576,6 +621,7 @@ public class MainActivity extends AppCompatActivity {
             } catch (Exception ignored) {}
         }
 
+        // NOVO: Glatko osvežavanje glavnog prikaza bez crnog ekrana i gašenja aktivnosti
         @Keep
         @JavascriptInterface
         public void reloadMainApp() {
@@ -585,6 +631,28 @@ public class MainActivity extends AppCompatActivity {
                     if (act.webView != null) {
                         act.webView.loadUrl("file:///android_asset/menu.html");
                     }
+                });
+            }
+        }
+
+        // NOVO: Stvarno brisanje keša, kolačića i skladišta WebView-a
+        @Keep
+        @JavascriptInterface
+        public void clearAppCacheAndData() {
+            if (mContext instanceof MainActivity) {
+                ((MainActivity) mContext).runOnUiThread(() -> {
+                    MainActivity act = (MainActivity) mContext;
+                    try {
+                        if (act.webView != null) {
+                            act.webView.clearCache(true);
+                            act.webView.clearHistory();
+                            act.webView.clearFormData();
+                            android.webkit.WebStorage.getInstance().deleteAllData();
+                        }
+                        CookieManager cookieManager = CookieManager.getInstance();
+                        cookieManager.removeAllCookies(null);
+                        cookieManager.flush();
+                    } catch (Exception ignored) {}
                 });
             }
         }
@@ -635,12 +703,14 @@ public class MainActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         if (webView != null) webView.onPause();
+        if (overlayWebView != null) overlayWebView.onPause();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         if (webView != null) webView.onResume();
+        if (overlayWebView != null) overlayWebView.onResume();
     }
 
     @Override
@@ -679,18 +749,10 @@ public class MainActivity extends AppCompatActivity {
         if (requestCode == FILE_CHOOSER_RESULT_CODE) {
             if (uploadMessage == null) return;
             Uri[] results = null;
-            if (resultCode == Activity.RESULT_OK) {
-                if (intent != null) {
-                    String dataString = intent.getDataString();
-                    if (dataString != null) {
-                        results = new Uri[]{Uri.parse(dataString)};
-                    } else if (intent.getClipData() != null) {
-                        int count = intent.getClipData().getItemCount();
-                        results = new Uri[count];
-                        for (int i = 0; i < count; i++) {
-                            results[i] = intent.getClipData().getItemAt(i).getUri();
-                        }
-                    }
+            if (resultCode == Activity.RESULT_OK && intent != null) {
+                String dataString = intent.getDataString();
+                if (dataString != null) {
+                    results = new Uri[]{Uri.parse(dataString)};
                 }
             }
             uploadMessage.onReceiveValue(results);
@@ -707,6 +769,14 @@ public class MainActivity extends AppCompatActivity {
             webView.removeAllViews();
             webView.destroy();
             webView = null;
+        }
+        if (overlayWebView != null) {
+            if (overlayWebView.getParent() instanceof android.view.ViewGroup) {
+                ((android.view.ViewGroup) overlayWebView.getParent()).removeView(overlayWebView);
+            }
+            overlayWebView.removeAllViews();
+            overlayWebView.destroy();
+            overlayWebView = null;
         }
         super.onDestroy();
     }
