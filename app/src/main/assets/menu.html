@@ -253,8 +253,6 @@ html, body{
         <button id="loadBtn"><span class="mask-text">Load</span></button>
         <button id="exitBtn"><span class="mask-text">Close</span></button>
     </div>
-    
-    <input type="file" id="fileInput" class="hidden-file-input" accept=".html,.htm" />
 </div>
 
 <!-- EDITOR MODAL (CONFIG) -->
@@ -404,73 +402,82 @@ if (!isMenuOverlay) {
     mainPopup.style.display = "flex";
 }
 
-// KLJUČNA IZMENA: Otvaranje file inputa MORA biti sinhrono, odmah na klik pre bilo kakvog await-a!
+// UNAPREĐENO DUGME "Load" (Kreira input u letu kao stari provereni kod)
 document.getElementById("loadBtn").addEventListener("click", function(){
-    // 1. Odmah otvaramo sistemski prozor za izbor fajla (zadržava korisnički gest token)
-    document.getElementById("fileInput").click();
-});
+    let fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = ".html,.htm";
+    fileInput.style.display = "none";
+    document.body.appendChild(fileInput);
 
-// Posao čišćenja baze, keša i startURL-a obavljamo u pozadini tek kada korisnik izabere fajl (ili u istom trenutku sinhrono)
-document.getElementById("fileInput").addEventListener("change", async function(event){
-    const file = event.target.files[0];
-    if(file){
-        const clearCheckbox = document.getElementById("clearDataCheckbox");
-        const userWantsClear = clearCheckbox && clearCheckbox.checked;
+    fileInput.addEventListener("change", async function(event){
+        const file = event.target.files[0];
+        if(file){
+            const fileName = file.name ? file.name.toLowerCase() : "";
+            if(file.type === "text/html" || file.type === "" || fileName.endsWith(".html") || fileName.endsWith(".htm")){
+                const clearCheckbox = document.getElementById("clearDataCheckbox");
+                const userWantsClear = clearCheckbox && clearCheckbox.checked;
 
-        // Proveravamo da li je aktivan startURL (živi sajt)
-        let isLiveSite = false;
-        if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.loadConfigFileRaw === 'function') {
-            const rawConfig = window.AndroidBridgeSaver.loadConfigFileRaw();
-            const match = rawConfig.match(/startURL\s*:\s*["']([^"']+)["']/);
-            if (match && match[1] && match[1].trim() !== "") {
-                isLiveSite = true;
-            }
-        }
-
-        // Ako smo bili na živom sajtu ILI je korisnik štiklirao da želi brisanje keša
-        if (isLiveSite || userWantsClear) {
-            try {
-                localStorage.clear();
-                sessionStorage.clear();
-                document.cookie.split(";").forEach(function(c) { 
-                    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
-                });
-                if ('caches' in window) {
-                    const cacheNames = await caches.keys();
-                    for (const name of cacheNames) {
-                        await caches.delete(name);
+                // Proveravamo da li je aktivan startURL (živi sajt)
+                let isLiveSite = false;
+                if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.loadConfigFileRaw === 'function') {
+                    const rawConfig = window.AndroidBridgeSaver.loadConfigFileRaw();
+                    const match = rawConfig.match(/startURL\s*:\s*["']([^"']+)["']/);
+                    if (match && match[1] && match[1].trim() !== "") {
+                        isLiveSite = true;
                     }
                 }
-            } catch(err) {}
-        }
 
-        // Brišemo startURL preko bridge-a
-        if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.clearStartUrl === 'function') {
-            window.AndroidBridgeSaver.clearStartUrl();
-        }
+                // Keš se briše samo ako smo bili na živom sajtu ILI je korisnik štiklirao opciju
+                if (isLiveSite || userWantsClear) {
+                    try {
+                        localStorage.clear();
+                        sessionStorage.clear();
+                        document.cookie.split(";").forEach(function(c) { 
+                            document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+                        });
+                        if ('caches' in window) {
+                            const cacheNames = await caches.keys();
+                            for (const name of cacheNames) {
+                                await caches.delete(name);
+                            }
+                        }
+                    } catch(err) {}
+                }
 
-        // Brišemo staru aplikaciju iz baze
-        await clearSavedApp();
+                // Brišemo startURL preko bridge-a
+                if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.clearStartUrl === 'function') {
+                    window.AndroidBridgeSaver.clearStartUrl();
+                }
 
-        // Čitamo novi fajl i snimamo ga
-        const reader = new FileReader();
-        reader.onload = async function(e) {
-            const htmlContent = e.target.result;
-            
-            await saveApp(htmlContent, file.name);
+                // Brišemo staru aplikaciju iz baze
+                await clearSavedApp();
 
-            if (window.AndroidMenuBridge && typeof window.AndroidMenuBridge.closeMenu === 'function') {
-                window.AndroidMenuBridge.closeMenu();
-            }
+                // Čitamo novi fajl i snimamo ga
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    const htmlContent = e.target.result;
+                    
+                    await saveApp(htmlContent, file.name);
 
-            if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.restartApp === 'function') {
-                window.AndroidBridgeSaver.restartApp();
+                    if (window.AndroidMenuBridge && typeof window.AndroidMenuBridge.closeMenu === 'function') {
+                        window.AndroidMenuBridge.closeMenu();
+                    }
+
+                    if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.restartApp === 'function') {
+                        window.AndroidBridgeSaver.restartApp();
+                    } else {
+                        location.reload();
+                    }
+                };
+                reader.readAsText(file);
             } else {
-                location.reload();
+                alert("Please select a valid HTML file.");
             }
-        };
-        reader.readAsText(file);
-    }
+        }
+    });
+
+    fileInput.click();
 });
 
 document.getElementById("exitBtn").addEventListener("click", function(){
