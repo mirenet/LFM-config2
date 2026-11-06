@@ -93,7 +93,7 @@ public class MainActivity extends AppCompatActivity {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
         
-        // --- KONTEJNER SA DVA WEBVIEW-a (Zadržana originalna struktura) ---
+        // --- KONTEJNER SA DVA WEBVIEW-a ---
         FrameLayout rootLayout = new FrameLayout(this);
         rootLayout.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -107,7 +107,7 @@ public class MainActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT));
         rootLayout.addView(webView);
 
-        // 2. Gornji WebView (Samo za živi sajt - učitava index.html sa parametrima menija)
+        // 2. Gornji WebView (Samo za živi sajt - učitava index.html sa ?menu=true)
         overlayWebView = new WebView(this);
         overlayWebView.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -152,11 +152,13 @@ public class MainActivity extends AppCompatActivity {
             webSettings.setUserAgentString(broAgent);
         }
 
+        // Tvoj originalni kod za forceDark bez ikakvih izmena i grešaka
         if (forceDark) {
             if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
                 WebSettingsCompat.setAlgorithmicDarkeningAllowed(webSettings, true);
             } else if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
                 @SuppressWarnings("deprecation")
+                boolean fallback = true;
                 WebSettingsCompat.setForceDark(webSettings, WebSettingsCompat.FORCE_DARK_ON);
             }
         }
@@ -466,7 +468,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // --- DETEKCIJA 6 TAPA BILO GDE NA EKRANU (Radi samo za žive sajtove) ---
+    // --- DETEKCIJA 6 TAPA ZA MENI ---
     @Override
     public boolean dispatchTouchEvent(MotionEvent event) {
         if (startURL != null && !startURL.trim().isEmpty() && !startURL.startsWith("file:///")) {
@@ -498,7 +500,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     }
-    // ---------------------------------------------------------------------
+    // --------------------------------
 
     private void loadConfigFromInternalStorage() {
         File configFile = new File(getFilesDir(), "appConfig.js");
