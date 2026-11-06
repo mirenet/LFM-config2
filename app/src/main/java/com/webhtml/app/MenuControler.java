@@ -12,11 +12,8 @@ public class MenuControler {
     private float lastY = 0;
     private final WebView overlayWebView;
     
-    // Dozvoljeno vreme između tapova (u milisekundama)
-    private static final long TAP_TIMEOUT = 250;
-    // Maksimalno dozvoljeno rastojanje u pikselima između uzastopnih tapova (da bi se računalo da je "isto mesto")
-    private static final float MAX_DISTANCE_PX = 80.0f; 
-    // Dozvoljeno pomeranje prsta unutar istog tapa (da se spreči skrolovanje)
+    private static final long TAP_TIMEOUT = 250; // Strogo brzo kuckanje
+    private static final float MAX_DISTANCE_PX = 50.0f; // U istoj tački
     private static final float MOVE_SLOP = 20.0f;
     private float startX = 0;
     private float startY = 0;
@@ -26,6 +23,11 @@ public class MenuControler {
     }
 
     public boolean handleTouchEvent(MotionEvent event) {
+        // KADA JE MENI VEĆ OTVOREN: Ignorišemo sve tapove da se ne bi zatvorio na dalje kuckanje
+        if (isMenuVisible()) {
+            return false;
+        }
+
         int action = event.getActionMasked();
 
         switch (action) {
@@ -42,11 +44,10 @@ public class MenuControler {
                 startX = currentX;
                 startY = currentY;
 
-                // Proveravamo da li je isteklo vreme ILI da je tap previše daleko od prethodnog mesta
                 if (tapCount > 0) {
                     float distance = (float) Math.hypot(currentX - lastX, currentY - lastY);
                     if ((currentTime - lastTapTime > TAP_TIMEOUT) || (distance > MAX_DISTANCE_PX)) {
-                        tapCount = 0; // Resetujemo ako je prošlo previše vremena ili ako je tapnuto na drugom mestu
+                        tapCount = 0;
                     }
                 }
 
@@ -67,7 +68,7 @@ public class MenuControler {
                     float moveX = Math.abs(event.getX() - startX);
                     float moveY = Math.abs(event.getY() - startY);
                     if (moveX > MOVE_SLOP || moveY > MOVE_SLOP) {
-                        tapCount = 0; // Poništavamo ako je prst počeo da skroluje
+                        tapCount = 0;
                     }
                 }
                 break;
