@@ -115,6 +115,29 @@ public class MainActivity extends AppCompatActivity {
         overlayWebView.getSettings().setAllowUniversalAccessFromFileURLs(true);
         overlayWebView.setVisibility(View.GONE);
 
+        // KLJUČNO: Dodat WebChromeClient za overlayWebView da bi otvorio fajl menadžer iz menija preko 6 tapa
+        overlayWebView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
+                if (uploadMessage != null) {
+                    uploadMessage.onReceiveValue(null);
+                    uploadMessage = null;
+                }
+
+                uploadMessage = filePathCallback;
+                Intent intent = fileChooserParams.createIntent();
+
+                try {
+                    startActivityForResult(intent, FILE_CHOOSER_RESULT_CODE);
+                } catch (Exception e) {
+                    uploadMessage = null;
+                    return false;
+                }
+
+                return true;
+            }
+        });
+
         overlayWebView.addJavascriptInterface(new ConfigSaverInterface(this), "AndroidBridgeSaver");
         
         overlayWebView.addJavascriptInterface(new Object() {
