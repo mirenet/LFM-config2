@@ -415,7 +415,11 @@ document.getElementById("fileInput").addEventListener("change", function(event){
             }
             await saveApp(htmlContent, file.name);
             
-            // Kada se uvozi novi HTML fajl, restartujemo aplikaciju da ga donji WebView učita
+            // Zatvaramo meni preko bridge-a i restartujemo aplikaciju da donji WebView učita novi fajl
+            if (window.AndroidMenuBridge && typeof window.AndroidMenuBridge.closeMenu === 'function') {
+                window.AndroidMenuBridge.closeMenu();
+            }
+
             if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.restartApp === 'function') {
                 window.AndroidBridgeSaver.restartApp();
             } else {
