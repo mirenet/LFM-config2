@@ -505,33 +505,11 @@ document.getElementById("loadBtn").addEventListener("click", function(){
 document.getElementById("exitBtn").addEventListener("click", function(){
     clearAllFocus();
 
-    // Direktan i pouzdan prover iz baze
-    getSavedApp().then(saved => {
-        const hasApp = saved && saved.content;
-        
-        if (!hasApp) {
-            // Ako nema sačuvane aplikacije (početni ekran je), gasi celu Android aplikaciju
-            if (window.AndroidMenuBridge && typeof window.AndroidMenuBridge.exitApp === 'function') {
-                window.AndroidMenuBridge.exitApp();
-            } else {
-                window.close();
-            }
-        } else {
-            // Ako aplikacija postoji, samo sakriva overlay meni
-            if (window.AndroidMenuBridge && typeof window.AndroidMenuBridge.closeMenu === 'function') {
-                window.AndroidMenuBridge.closeMenu();
-            } else {
-                window.close();
-            }
-        }
-    }).catch(() => {
-        // Fallback u slučaju bilo kakve greške sa bazom - gasi aplikaciju jer je najverovatnije početni ekran
-        if (window.AndroidMenuBridge && typeof window.AndroidMenuBridge.exitApp === 'function') {
-            window.AndroidMenuBridge.exitApp();
-        } else {
-            window.close();
-        }
-    });
+    if (window.AndroidMenuBridge && typeof window.AndroidMenuBridge.closeMenu === 'function') {
+        window.AndroidMenuBridge.closeMenu();
+    } else {
+        window.close();
+    }
 });
 </script>
 </body>
