@@ -505,11 +505,26 @@ document.getElementById("loadBtn").addEventListener("click", function(){
 document.getElementById("exitBtn").addEventListener("click", function(){
     clearAllFocus();
 
-    if (window.AndroidMenuBridge && typeof window.AndroidMenuBridge.closeMenu === 'function') {
-        window.AndroidMenuBridge.closeMenu();
-    } else {
-        window.close();
-    }
+    // Proveravamo da li je ovo prvo pokretanje (nema sačuvane aplikacije i prikazan je glavni meni)
+    getSavedApp().then(saved => {
+        const hasApp = saved && saved.content;
+        
+        if (!hasApp) {
+            // Ako nema učitane aplikacije, potpuno gasimo Android aplikaciju
+            if (window.AndroidMenuBridge && typeof window.AndroidMenuBridge.exitApp === 'function') {
+                window.AndroidMenuBridge.exitApp();
+            } else {
+                window.close();
+            }
+        } else {
+            // Ako aplikacija postoji, samo zatvaramo overlay meni
+            if (window.AndroidMenuBridge && typeof window.AndroidMenuBridge.closeMenu === 'function') {
+                window.AndroidMenuBridge.closeMenu();
+            } else {
+                window.close();
+            }
+        }
+    });
 });
 </script>
 </body>
