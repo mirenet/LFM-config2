@@ -402,7 +402,7 @@ if (!isMenuOverlay) {
     mainPopup.style.display = "flex";
 }
 
-// UNAPREĐENO DUGME "Load" (Kreira input u letu kao stari provereni kod)
+// UNAPREĐENO DUGME "Load" (Bez crnog ekrana, sa ispravnim brisanjem keša)
 document.getElementById("loadBtn").addEventListener("click", function(){
     let fileInput = document.createElement("input");
     fileInput.type = "file";
@@ -418,7 +418,7 @@ document.getElementById("loadBtn").addEventListener("click", function(){
                 const clearCheckbox = document.getElementById("clearDataCheckbox");
                 const userWantsClear = clearCheckbox && clearCheckbox.checked;
 
-                // Proveravamo da li je aktivan startURL (živi sajt)
+                // Provera da li je aktivan startURL (živi sajt)
                 let isLiveSite = false;
                 if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.loadConfigFileRaw === 'function') {
                     const rawConfig = window.AndroidBridgeSaver.loadConfigFileRaw();
@@ -428,21 +428,11 @@ document.getElementById("loadBtn").addEventListener("click", function(){
                     }
                 }
 
-                // Keš se briše samo ako smo bili na živom sajtu ILI je korisnik štiklirao opciju
+                // Brisanje prave keš memorije aplikacije preko nove Java metode ako je potrebno
                 if (isLiveSite || userWantsClear) {
-                    try {
-                        localStorage.clear();
-                        sessionStorage.clear();
-                        document.cookie.split(";").forEach(function(c) { 
-                            document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
-                        });
-                        if ('caches' in window) {
-                            const cacheNames = await caches.keys();
-                            for (const name of cacheNames) {
-                                await caches.delete(name);
-                            }
-                        }
-                    } catch(err) {}
+                    if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.clearAppCacheAndData === 'function') {
+                        window.AndroidBridgeSaver.clearAppCacheAndData();
+                    }
                 }
 
                 // Brišemo startURL preko bridge-a
@@ -450,7 +440,7 @@ document.getElementById("loadBtn").addEventListener("click", function(){
                     window.AndroidBridgeSaver.clearStartUrl();
                 }
 
-                // Brišemo staru aplikaciju iz baze
+                // Brišemo staru aplikaciju iz IndexedDB baze
                 await clearSavedApp();
 
                 // Čitamo novi fajl i snimamo ga
@@ -460,12 +450,14 @@ document.getElementById("loadBtn").addEventListener("click", function(){
                     
                     await saveApp(htmlContent, file.name);
 
+                    // Zatvaramo meni
                     if (window.AndroidMenuBridge && typeof window.AndroidMenuBridge.closeMenu === 'function') {
                         window.AndroidMenuBridge.closeMenu();
                     }
 
-                    if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.restartApp === 'function') {
-                        window.AndroidBridgeSaver.restartApp();
+                    // GLATKO OSVEŽAVANJE BEZ CRNOG EKRANA (Umesto restartApp)
+                    if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.reloadMainApp === 'function') {
+                        window.AndroidBridgeSaver.reloadMainApp();
                     } else {
                         location.reload();
                     }
