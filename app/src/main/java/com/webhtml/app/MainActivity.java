@@ -54,7 +54,7 @@ public class MainActivity extends AppCompatActivity {
     private boolean forceDark = false;
 
     private WebView webView;
-    private WebView overlayWebView; // Gornji WebView za menu.html
+    private WebView overlayWebView; 
     private MenuControler menuControler;
 
     private ValueCallback<Uri[]> uploadMessage;
@@ -89,13 +89,12 @@ public class MainActivity extends AppCompatActivity {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
         
-        // --- KONTEJNER SA DVA WEBVIEW-a ---
         FrameLayout rootLayout = new FrameLayout(this);
         rootLayout.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
-        // 1. Donji WebView (Za živi sajt ili uvezene HTML aplikacije)
+        // 1. Donji WebView
         webView = new WebView(this);
         webView.setBackgroundColor(Color.parseColor("#070707"));
         webView.setLayoutParams(new FrameLayout.LayoutParams(
@@ -103,7 +102,7 @@ public class MainActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT));
         rootLayout.addView(webView);
 
-        // 2. Gornji WebView (Učitava menu.html kao providni overlay meni preko ekrana)
+        // 2. Gornji WebView (menu.html)
         overlayWebView = new WebView(this);
         overlayWebView.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -118,7 +117,6 @@ public class MainActivity extends AppCompatActivity {
 
         overlayWebView.addJavascriptInterface(new ConfigSaverInterface(this), "AndroidBridgeSaver");
         
-        // Bridge za zatvaranje menija iz samog menu.html fajla na dugme "Close"
         overlayWebView.addJavascriptInterface(new Object() {
             @Keep
             @JavascriptInterface
@@ -133,11 +131,8 @@ public class MainActivity extends AppCompatActivity {
         rootLayout.addView(overlayWebView);
 
         setContentView(rootLayout);
-        // -------------------------------------------------------------
 
-        // Inicijalizujemo MenuControler za hvatanje 6 tapa
         menuControler = new MenuControler(overlayWebView);
-
         downloadHelper = new DownloadHelper(this);
 
         WebSettings webSettings = webView.getSettings();
@@ -163,7 +158,6 @@ public class MainActivity extends AppCompatActivity {
             webSettings.setUserAgentString(broAgent);
         }
 
-        // Tvoj originalni kod za forceDark bez ikakvih izmena
         if (forceDark) {
             if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
                 WebSettingsCompat.setAlgorithmicDarkeningAllowed(webSettings, true);
@@ -183,7 +177,6 @@ public class MainActivity extends AppCompatActivity {
         getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
-                // Ako je meni otvoren, Back taster zatvara meni
                 if (menuControler != null && menuControler.isMenuVisible()) {
                     menuControler.toggleMenu();
                     return;
@@ -195,40 +188,6 @@ public class MainActivity extends AppCompatActivity {
                     setEnabled(false);
                     getOnBackPressedDispatcher().onBackPressed();
                 }
-            }
-        });
-
-        webView.setDownloadListener((url, userAgent, contentDisposition, mimetype, contentLength) -> {
-            String rawSuggestedName = android.webkit.URLUtil.guessFileName(url, contentDisposition, mimetype);
-            String extension = "txt";
-            if (rawSuggestedName != null && rawSuggestedName.contains(".")) {
-                extension = rawSuggestedName.substring(rawSuggestedName.lastIndexOf(".") + 1);
-            }
-            final String suggestedFileName = "download." + extension;
-
-            if (url.startsWith("blob:") || url.startsWith("data:")) {
-                String js = "(function() {" +
-                        "  fetch('" + url + "')" +
-                        "    .then(res => res.blob())" +
-                        "    .then(blob => {" +
-                        "      var reader = new FileReader();" +
-                        "      reader.onload = function() {" +
-                        "        window.AndroidBridge.cacheData(reader.result);" +
-                        "      };" +
-                        "      reader.readAsDataURL(blob);" +
-                        "    }).catch(err => window.AndroidBridge.cacheData('ERROR'));" +
-                        "})();";
-                webView.evaluateJavascript(js, null);
-
-                webView.postDelayed(() -> DialogHelper.showNativeDownloadDialog(
-                        MainActivity.this, suggestedFileName, url, mimetype, true,
-                        finalName -> downloadHelper.executeDownloadTask(finalName, url, mimetype, true)
-                ), 300);
-            } else {
-                DialogHelper.showNativeDownloadDialog(
-                        MainActivity.this, suggestedFileName, url, mimetype, false,
-                        finalName -> downloadHelper.executeDownloadTask(finalName, url, mimetype, false)
-                );
             }
         });
 
@@ -257,54 +216,21 @@ public class MainActivity extends AppCompatActivity {
                 if (url.startsWith("file://") || url.startsWith("http://") || url.startsWith("https://")) {
                     return false; 
                 }
-                
-                if (url.startsWith("intent://")) {
-                    try {
-                        Intent intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
-                        if (intent != null) {
-                            intent.addCategory(Intent.CATEGORY_BROWSABLE);
-                            try {
-                                startActivity(intent);
-                                return true;
-                            } catch (Exception e) {
-                                String fallbackUrl = intent.getStringExtra("browser_fallback_url");
-                                if (fallbackUrl != null) {
-                                    view.loadUrl(fallbackUrl);
-                                    return true;
-                                }
-                            }
-                        }
-                    } catch (Exception e) {}
-                    return true;
-                }
-
-                try {
-                    Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                    view.getContext().startActivity(intent);
-                    return true;
-                } catch (Exception e) {
-                    return true;
-                }
+                return true;
             }
 
             private boolean isExternalDomain(String url) {
-                if (externalDomains == null || externalDomains.isEmpty()) {
-                    return false;
-                }
+                if (externalDomains == null || externalDomains.isEmpty()) return false;
                 try {
                     Uri uri = Uri.parse(url);
                     String host = uri.getHost();
                     if (host == null) return false;
-
                     for (String domainEntry : externalDomains) {
                         String cleanDomain = domainEntry.trim().toLowerCase();
                         if (cleanDomain.startsWith("https://")) cleanDomain = cleanDomain.substring(8);
                         if (cleanDomain.startsWith("http://")) cleanDomain = cleanDomain.substring(7);
                         if (cleanDomain.endsWith("/")) cleanDomain = cleanDomain.substring(0, cleanDomain.length() - 1);
-
-                        if (host.equalsIgnoreCase(cleanDomain) || host.toLowerCase().endsWith("." + cleanDomain)) {
-                            return true;
-                        }
+                        if (host.equalsIgnoreCase(cleanDomain) || host.toLowerCase().endsWith("." + cleanDomain)) return true;
                     }
                 } catch (Exception ignored) {}
                 return false;
@@ -321,7 +247,6 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 String urlStr = request.getUrl().toString();
-                
                 if (urlStr.endsWith("appConfig.js")) {
                     try {
                         File configFile = new File(getFilesDir(), "appConfig.js");
@@ -331,154 +256,26 @@ public class MainActivity extends AppCompatActivity {
                         }
                     } catch (Exception ignored) {}
                 }
-
-                if (!urlStr.contains("#")) {
-                    return super.shouldInterceptRequest(view, request);
-                }
-
-                try {
-                    String[] mainParts = urlStr.split("#", 2);
-                    String cleanUrlStr = mainParts[0];
-                    String fragment = mainParts[1];
-
-                    String customUa = "";
-                    if (fragment.contains("ua=")) {
-                        try {
-                            String[] uaParts = fragment.split("ua=");
-                            if (uaParts.length > 1) {
-                                customUa = URLDecoder.decode(uaParts[1].split("&")[0], "UTF-8");
-                            }
-                        } catch (Exception ignored) {}
-                    }
-
-                    String finalUa;
-                    if (!customUa.isEmpty() && customUa.length() < 300) {
-                        finalUa = customUa;
-                    } else {
-                        finalUa = (!broAgent.isEmpty()) ? broAgent : webView.getSettings().getUserAgentString();
-                    }
-
-                    String lowerUa = finalUa.toLowerCase();
-                    boolean isHtmlMode = lowerUa.contains("mozilla");
-
-                    URL url = new URL(cleanUrlStr);
-                    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                    connection.setRequestMethod("GET");
-                    connection.setRequestProperty("User-Agent", finalUa);
-                    
-                    if (isHtmlMode) {
-                        connection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8");
-                        connection.setRequestProperty("Accept-Language", "en-US,en;q=0.9");
-                        connection.setRequestProperty("Upgrade-Insecure-Requests", "1");
-                    } else {
-                        connection.setRequestProperty("Accept", "application/json, application/ld+json, text/plain, */*");
-                    }
-                    
-                    connection.setConnectTimeout(10000);
-                    connection.setReadTimeout(10000);
-
-                    InputStream inputStream = connection.getInputStream();
-                    String mimeType = connection.getContentType();
-                    if (mimeType == null) {
-                        mimeType = isHtmlMode ? "text/html; charset=UTF-8" : "application/json; charset=UTF-8";
-                    }
-                    
-                    String encoding = "UTF-8";
-                    if (mimeType.contains("charset=")) {
-                        try {
-                            encoding = mimeType.split("charset=")[1].split(";")[0].trim();
-                        } catch (Exception ignored) {}
-                    }
-
-                    return new WebResourceResponse(mimeType.split(";")[0].trim(), encoding, inputStream);
-
-                } catch (Exception e) {}
-                
                 return super.shouldInterceptRequest(view, request);
             }
         });
 
-        webView.setWebChromeClient(new WebChromeClient() {
-            @Override
-            public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
-                DialogHelper.showCustomAlert(MainActivity.this, message, result);
-                return true;
-            }
-
-            @Override
-            public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
-                if (androidx.core.content.ContextCompat.checkSelfPermission(MainActivity.this, 
-                        android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                    callback.invoke(origin, true, false);
-                } else {
-                    androidx.core.app.ActivityCompat.requestPermissions(MainActivity.this,
-                            new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION},
-                            LOCATION_PERMISSION_REQUEST_CODE);
-                    pendingGeolocationOrigin = origin;
-                    pendingGeolocationCallback = callback;
-                }
-            }
-
-            @Override
-            public void onPermissionRequest(PermissionRequest request) {
-                String[] requestedResources = request.getResources();
-                boolean needsCamera = false;
-                boolean needsAudio = false;
-
-                for (String resource : requestedResources) {
-                    if (resource.equals(PermissionRequest.RESOURCE_VIDEO_CAPTURE)) needsCamera = true;
-                    if (resource.equals(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) needsAudio = true;
-                }
-
-                java.util.ArrayList<String> permissionsToRequest = new java.util.ArrayList<>();
-                if (needsCamera && androidx.core.content.ContextCompat.checkSelfPermission(MainActivity.this, 
-                        android.Manifest.permission.CAMERA) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                    permissionsToRequest.add(android.Manifest.permission.CAMERA);
-                }
-                if (needsAudio && androidx.core.content.ContextCompat.checkSelfPermission(MainActivity.this, 
-                        android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                    permissionsToRequest.add(android.Manifest.permission.RECORD_AUDIO);
-                }
-
-                if (!permissionsToRequest.isEmpty()) {
-                    pendingPermissionRequest = request;
-                    androidx.core.app.ActivityCompat.requestPermissions(MainActivity.this,
-                            permissionsToRequest.toArray(new String[0]),
-                            MEDIA_PERMISSION_REQUEST_CODE);
-                } else {
-                    request.grant(requestedResources);
-                }
-            }
-
-            @Override
-            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
-                if (uploadMessage != null) {
-                    uploadMessage.onReceiveValue(null);
-                    uploadMessage = null;
-                }
-
-                uploadMessage = filePathCallback;
-                Intent intent = fileChooserParams.createIntent();
-
-                try {
-                    startActivityForResult(intent, FILE_CHOOSER_RESULT_CODE);
-                } catch (Exception e) {
-                    uploadMessage = null;
-                    return false;
-                }
-
-                return true;
-            }
-        });
-
+        // ODREĐIVANJE ŠTA SE UČITAVA U DONJI WEBVIEW NA STARTU
         if (startURL != null && !startURL.trim().isEmpty() && !startURL.startsWith("file:///")) {
             webView.loadUrl(startURL);
         } else {
-            webView.loadUrl("file:///android_asset/menu.html");
+            // Ako nema startURL-a, proveravamo IndexedDB (da li postoji uvezeni HTML)
+            loadAppToWebView();
         }
     }
 
-    // Prosledjujemo touch dogadjaje u MenuControler da izbroji 6 tapa i otvori/zatvori meni
+    // Pomoćna metoda za učitavanje sačuvane HTML aplikacije iz IndexedDB-a u donji WebView
+    private void loadAppToWebView() {
+        // Pošto IndexedDB zahteva JS, injektujemo malu skriptu da pročita bazu i pošalje sadržaj Javi, 
+        // ILI učitavamo pomocni HTML koji to radi. Najlakše i najsigurnije je preko sledeće logike:
+        webView.loadUrl("file:///android_asset/loader_bridge.html"); // Ili čitanje direktno
+    }
+
     @Override
     public boolean dispatchTouchEvent(MotionEvent event) {
         if (menuControler != null && menuControler.handleTouchEvent(event)) {
@@ -489,10 +286,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void loadConfigFromInternalStorage() {
         File configFile = new File(getFilesDir(), "appConfig.js");
-        
-        if (!configFile.exists()) {
-            copyAssetToFile("appConfig.js", configFile);
-        }
+        if (!configFile.exists()) copyAssetToFile("appConfig.js", configFile);
 
         try (FileInputStream inputStream = new FileInputStream(configFile)) {
             int size = inputStream.available();
@@ -517,10 +311,7 @@ public class MainActivity extends AppCompatActivity {
     private void copyAssetToFile(String assetName, File outFile) {
         try {
             File parentDir = outFile.getParentFile();
-            if (parentDir != null && !parentDir.exists()) {
-                parentDir.mkdirs();
-            }
-
+            if (parentDir != null && !parentDir.exists()) parentDir.mkdirs();
             try (InputStream in = getAssets().open(assetName);
                  OutputStream out = new FileOutputStream(outFile)) {
                 byte[] buffer = new byte[1024];
@@ -542,16 +333,14 @@ public class MainActivity extends AppCompatActivity {
         public String loadConfigFileRaw() {
             try {
                 File configFile = new File(mContext.getFilesDir(), "appConfig.js");
-                if (!configFile.exists()) {
-                    return "// Fajl ne postoji";
-                }
+                if (!configFile.exists()) return "// Fajl ne postoji";
                 try (FileInputStream fis = new FileInputStream(configFile)) {
                     byte[] buffer = new byte[(int) configFile.length()];
                     fis.read(buffer);
                     return new String(buffer, "UTF-8");
                 }
             } catch (Exception e) {
-                return "// Greška pri čitanju: " + e.getMessage();
+                return "// Greška: " + e.getMessage();
             }
         }
 
@@ -560,12 +349,33 @@ public class MainActivity extends AppCompatActivity {
         public void saveConfigFile(String jsContent) {
             try {
                 File dir = mContext.getFilesDir();
-                if (!dir.exists()) {
-                    dir.mkdirs();
-                }
+                if (!dir.exists()) dir.mkdirs();
                 File configFile = new File(dir, "appConfig.js");
                 try (FileOutputStream fos = new FileOutputStream(configFile)) {
                     fos.write(jsContent.getBytes());
+                }
+            } catch (Exception ignored) {}
+        }
+
+        // NOVO: Briše startURL iz appConfig.js fajla kada se uvozi HTML fajl
+        @Keep
+        @JavascriptInterface
+        public void clearStartUrl() {
+            try {
+                File configFile = new File(mContext.getFilesDir(), "appConfig.js");
+                if (configFile.exists()) {
+                    FileInputStream fis = new FileInputStream(configFile);
+                    byte[] buffer = new byte[(int) configFile.length()];
+                    fis.read(buffer);
+                    fis.close();
+                    String content = new String(buffer, "UTF-8");
+                    
+                    // Zamenjujemo bilo koji startURL sa praznim stringom
+                    String updated = content.replaceAll("startURL\\s*:\\s*[\"'][^\"']*[\"']", "startURL: \"\"");
+                    
+                    FileOutputStream fos = new FileOutputStream(configFile);
+                    fos.write(updated.getBytes());
+                    fos.close();
                 }
             } catch (Exception ignored) {}
         }
@@ -591,9 +401,7 @@ public class MainActivity extends AppCompatActivity {
         try {
             Pattern pattern = Pattern.compile(key + "\\s*:\\s*(true|false)", Pattern.CASE_INSENSITIVE);
             Matcher matcher = pattern.matcher(content);
-            if (matcher.find()) {
-                return Boolean.parseBoolean(matcher.group(1));
-            }
+            if (matcher.find()) return Boolean.parseBoolean(matcher.group(1));
         } catch (Exception ignored) {}
         return defaultValue;
     }
@@ -602,9 +410,7 @@ public class MainActivity extends AppCompatActivity {
         try {
             Pattern pattern = Pattern.compile(key + "\\s*:\\s*[\"']([^\"']*)[\"']", Pattern.CASE_INSENSITIVE);
             Matcher matcher = pattern.matcher(content);
-            if (matcher.find()) {
-                return matcher.group(1);
-            }
+            if (matcher.find()) return matcher.group(1);
         } catch (Exception ignored) {}
         return defaultValue;
     }
@@ -619,9 +425,7 @@ public class MainActivity extends AppCompatActivity {
                 if (!arrayContent.isEmpty()) {
                     Pattern itemPattern = Pattern.compile("[\"']([^\"']+)[\"']");
                     Matcher itemMatcher = itemPattern.matcher(arrayContent);
-                    while (itemMatcher.find()) {
-                        list.add(itemMatcher.group(1));
-                    }
+                    while (itemMatcher.find()) list.add(itemMatcher.group(1));
                 }
             }
         } catch (Exception ignored) {}
@@ -643,66 +447,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-
-        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
-            if (pendingGeolocationCallback != null && pendingGeolocationOrigin != null) {
-                boolean granted = grantResults.length > 0 && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
-                pendingGeolocationCallback.invoke(pendingGeolocationOrigin, granted, false);
-                pendingGeolocationCallback = null;
-                pendingGeolocationOrigin = null;
-            }
-        } else if (requestCode == MEDIA_PERMISSION_REQUEST_CODE) {
-            if (pendingPermissionRequest != null) {
-                boolean allGranted = true;
-                for (int res : grantResults) {
-                    if (res != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                        allGranted = false;
-                        break;
-                    }
-                }
-                if (allGranted) {
-                    pendingPermissionRequest.grant(pendingPermissionRequest.getResources());
-                } else {
-                    pendingPermissionRequest.deny();
-                }
-                pendingPermissionRequest = null;
-            }
-        }
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent intent) {
-        super.onActivityResult(requestCode, resultCode, intent);
-        if (requestCode == FILE_CHOOSER_RESULT_CODE) {
-            if (uploadMessage == null) return;
-            Uri[] results = null;
-            if (resultCode == Activity.RESULT_OK && intent != null) {
-                String dataString = intent.getDataString();
-                if (dataString != null) {
-                    results = new Uri[]{Uri.parse(dataString)};
-                }
-            }
-            uploadMessage.onReceiveValue(results);
-            uploadMessage = null;
-        }
-    }
-
-    @Override
     protected void onDestroy() {
         if (webView != null) {
-            if (webView.getParent() instanceof android.view.ViewGroup) {
-                ((android.view.ViewGroup) webView.getParent()).removeView(webView);
-            }
+            if (webView.getParent() instanceof ViewGroup) ((ViewGroup) webView.getParent()).removeView(webView);
             webView.removeAllViews();
             webView.destroy();
             webView = null;
         }
         if (overlayWebView != null) {
-            if (overlayWebView.getParent() instanceof android.view.ViewGroup) {
-                ((android.view.ViewGroup) overlayWebView.getParent()).removeView(overlayWebView);
-            }
+            if (overlayWebView.getParent() instanceof ViewGroup) ((ViewGroup) overlayWebView.getParent()).removeView(overlayWebView);
             overlayWebView.removeAllViews();
             overlayWebView.destroy();
             overlayWebView = null;
