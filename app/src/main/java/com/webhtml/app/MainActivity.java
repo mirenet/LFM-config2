@@ -102,7 +102,7 @@ public class MainActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT));
         rootLayout.addView(webView);
 
-        // 2. Gornji WebView (Učitava menu.html direktno iz keša bez ikakvog mrežnog/diskovnog kašnjenja)
+        // 2. Gornji WebView (Učitava menu.html OBAVEZNO sa ?menu=true parametrom i optimizovan za trenutni prikaz)
         overlayWebView = new WebView(this);
         overlayWebView.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -151,19 +151,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }, "AndroidMenuBridge");
 
-        // Trenutno učitavanje sadržaja menija iz assets foldera kao string bez kašnjenja
-        try {
-            InputStream is = getAssets().open("menu.html");
-            int size = is.available();
-            byte[] buffer = new byte[size];
-            is.read(buffer);
-            is.close();
-            String menuHtmlContent = new String(buffer, "UTF-8");
-            overlayWebView.loadDataWithBaseURL("file:///android_asset/menu.html", menuHtmlContent, "text/html", "UTF-8", null);
-        } catch (Exception e) {
-            overlayWebView.loadUrl("file:///android_asset/menu.html?menu=true");
-        }
-
+        overlayWebView.loadUrl("file:///android_asset/menu.html?menu=true");
         rootLayout.addView(overlayWebView);
 
         setContentView(rootLayout);
