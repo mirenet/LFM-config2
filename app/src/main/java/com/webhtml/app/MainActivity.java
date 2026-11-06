@@ -157,6 +157,25 @@ public class MainActivity extends AppCompatActivity {
         menuControler = new MenuControler(overlayWebView);
         downloadHelper = new DownloadHelper(this);
 
+        // Presretanje Back dugmeta da NE zatvara meni i da ne radi ništa dok je meni aktivan
+        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+        @Override
+        public void handleOnBackPressed() {
+        if (menuControler != null && menuControler.isMenuVisible()) {
+        // Meni je otvoren -> IGNORIŠEMO Back dugme u potpunosti!
+        return;
+        }
+
+        // Ako meni nije otvoren, dozvoli standardnu navigaciju ili izlaz
+        if (webView.canGoBack()) {
+        webView.goBack();
+        } else {
+        setEnabled(false);
+        getOnBackPressedDispatcher().onBackPressed();
+           }
+          }
+        });
+
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
         webSettings.setDomStorageEnabled(true);
