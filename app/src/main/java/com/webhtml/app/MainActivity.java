@@ -102,7 +102,7 @@ public class MainActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT));
         rootLayout.addView(webView);
 
-        // 2. Gornji WebView (Učitavanje standardno preko loadUrl)
+        // 2. Gornji WebView (Overlay meni)
         overlayWebView = new WebView(this);
         overlayWebView.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -141,6 +141,7 @@ public class MainActivity extends AppCompatActivity {
 
         overlayWebView.addJavascriptInterface(new ConfigSaverInterface(this), "AndroidBridgeSaver");
         
+        // DODATO: Omogućavanje AndroidMenuBridge-a i za overlay WebView da bi dugme Close moglo da ugasi aplikaciju
         overlayWebView.addJavascriptInterface(new Object() {
             @Keep
             @JavascriptInterface
@@ -160,7 +161,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }, "AndroidMenuBridge");
 
-        // Vraćeno standardno učitavanje fajla sa diska bez keširanja
         overlayWebView.loadUrl("file:///android_asset/menu.html?menu=true");
         rootLayout.addView(overlayWebView);
 
