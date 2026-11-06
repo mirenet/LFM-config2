@@ -29,7 +29,7 @@ html, body{
 }
 
 .popup{
-    display: flex;
+    display: none;
     flex-direction: column;
     align-items: stretch;
     position: fixed;
@@ -375,21 +375,24 @@ document.getElementById("saveConfigBtn").addEventListener("click", () => {
 
 initPreferences();
 
-// PROVERA NA STARTU: Ako postoji sačuvana aplikacija, odmah je prikaži (zameni sadržaj stranice sa sačuvanom app)
-getSavedApp().then(saved => {
-    const urlParams = new URLSearchParams(window.location.search);
-    // Ako je ovo otvoren overlay meni preko ?menu=true, uvek prikaži meni
-    if (urlParams.get('menu') === 'true') {
-        mainPopup.style.display = "flex";
-    } else if (saved && saved.content) {
-        // Zamenjujemo sadržaj menu.html sačuvanom aplikacijom!
-        document.open();
-        document.write(saved.content);
-        document.close();
-    } else {
-        mainPopup.style.display = "flex";
-    }
-});
+// INICIJALIZACIJA BEZ BLESKA: Provera pre nego što se meni uopšte pojavi na ekranu
+const urlParams = new URLSearchParams(window.location.search);
+const isMenuOverlay = urlParams.get('menu') === 'true';
+
+if (!isMenuOverlay) {
+    getSavedApp().then(saved => {
+        if (saved && saved.content) {
+            document.open();
+            document.write(saved.content);
+            document.close();
+        } else {
+            mainPopup.style.display = "flex";
+        }
+    });
+} else {
+    // Ako je ovo gornji overlay meni, uvek prikaži popup
+    mainPopup.style.display = "flex";
+}
 
 document.getElementById("loadBtn").addEventListener("click", function(){
     document.getElementById("fileInput").click();
@@ -410,12 +413,11 @@ document.getElementById("fileInput").addEventListener("change", function(event){
             }
             await saveApp(htmlContent, file.name);
             
-            // AUTOMATSKI BRIŠEMO startURL IZ appConfig.js KAD SE UVEZE HTML FAJL!
+            // BRIŠEMO startURL IZ appConfig.js KAD SE UVEZE HTML FAJL!
             if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.clearStartUrl === 'function') {
                 window.AndroidBridgeSaver.clearStartUrl();
             }
 
-            // Zatvaramo meni preko bridge-a ako je u overlay modu, ili radimo reload
             if (window.AndroidMenuBridge && typeof window.AndroidMenuBridge.closeMenu === 'function') {
                 window.AndroidMenuBridge.closeMenu();
             }
