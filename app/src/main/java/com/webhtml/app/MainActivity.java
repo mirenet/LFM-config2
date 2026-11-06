@@ -54,7 +54,7 @@ public class MainActivity extends AppCompatActivity {
     private boolean forceDark = false;
 
     private WebView webView;
-    private WebView overlayWebView; // Gornji WebView za meni (menu.html)
+    private WebView overlayWebView; 
     private MenuControler menuControler;
 
     private ValueCallback<Uri[]> uploadMessage;
@@ -89,13 +89,12 @@ public class MainActivity extends AppCompatActivity {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
         
-        // --- KONTEJNER SA DVA WEBVIEW SLOJA ---
         FrameLayout rootLayout = new FrameLayout(this);
         rootLayout.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
-        // 1. Donji WebView (Prikazuje živi sajt, ili u uvezenom modu sam učitava menu.html / aplikaciju)
+        // 1. Donji WebView
         webView = new WebView(this);
         webView.setBackgroundColor(Color.parseColor("#070707"));
         webView.setLayoutParams(new FrameLayout.LayoutParams(
@@ -103,7 +102,7 @@ public class MainActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT));
         rootLayout.addView(webView);
 
-        // 2. Gornji WebView (Učitava menu.html kao providni overlay meni)
+        // 2. Gornji WebView (Učitava menu.html OBAVEZNO sa ?menu=true parametrom)
         overlayWebView = new WebView(this);
         overlayWebView.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -118,7 +117,6 @@ public class MainActivity extends AppCompatActivity {
 
         overlayWebView.addJavascriptInterface(new ConfigSaverInterface(this), "AndroidBridgeSaver");
         
-        // Bridge za zatvaranje menija iz samog menu.html na dugme "Close"
         overlayWebView.addJavascriptInterface(new Object() {
             @Keep
             @JavascriptInterface
@@ -129,15 +127,13 @@ public class MainActivity extends AppCompatActivity {
             }
         }, "AndroidMenuBridge");
 
-        overlayWebView.loadUrl("file:///android_asset/menu.html");
+        // KLJUČNO: ?menu=true osigurava da gornji WebView uvek prepozna da je meni režim
+        overlayWebView.loadUrl("file:///android_asset/menu.html?menu=true");
         rootLayout.addView(overlayWebView);
 
         setContentView(rootLayout);
-        // -------------------------------------------------------------
 
-        // Inicijalizujemo MenuControler za hvatanje 6 tapa
         menuControler = new MenuControler(overlayWebView);
-
         downloadHelper = new DownloadHelper(this);
 
         WebSettings webSettings = webView.getSettings();
@@ -182,7 +178,6 @@ public class MainActivity extends AppCompatActivity {
         getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
-                // Ako je meni otvoren, Back taster zatvara meni
                 if (menuControler != null && menuControler.isMenuVisible()) {
                     menuControler.toggleMenu();
                     return;
@@ -474,12 +469,10 @@ public class MainActivity extends AppCompatActivity {
         if (startURL != null && !startURL.trim().isEmpty() && !startURL.startsWith("file:///")) {
             webView.loadUrl(startURL);
         } else {
-            // Ako nema startURL-a, donji WebView učitava menu.html
             webView.loadUrl("file:///android_asset/menu.html");
         }
     }
 
-    // Prosleđujemo touch događaje u MenuControler da izbroji 6 tapa i otvori/zatvori meni
     @Override
     public boolean dispatchTouchEvent(MotionEvent event) {
         if (menuControler != null && menuControler.handleTouchEvent(event)) {
@@ -571,7 +564,6 @@ public class MainActivity extends AppCompatActivity {
             } catch (Exception ignored) {}
         }
 
-        // Automatski briše startURL iz appConfig.js kada se uvozi lokalni HTML fajl
         @Keep
         @JavascriptInterface
         public void clearStartUrl() {
