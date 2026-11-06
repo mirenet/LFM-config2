@@ -209,20 +209,26 @@ html, body{
     color: #555 !important;
     margin-top: 6px;
     transition: filter 0.15s, background 0.15s;
-    outline: none;
-    -webkit-tap-highlight-color: transparent;
+    outline: none !important;
+    -webkit-tap-highlight-color: transparent !important;
 }
 
-/* Sprečavamo da dugme zadrži svetli efekat fokusa bez prelaza mišem/dodira */
-.row button:hover, .row button:focus{
+/* Potpuno uklanjamo bilo kakav trajni focus ili highlight na dugmadi */
+.row button:hover{
     filter: brightness(1.25);
     box-shadow: 0 3px 10px rgba(0,0,0,0.3);
-    outline: none;
+}
+
+.row button:focus, .row button:active {
+    outline: none !important;
+    box-shadow: none !important;
+    filter: none !important;
 }
 
 .mask-text{
     color: #555;
     filter: brightness(0);
+    pointer-events: none;
 }
 
 .hidden-file-input {
@@ -398,16 +404,15 @@ if (!isMenuOverlay) {
             document.close();
         } else {
             mainPopup.style.display = "flex";
-            // Uklanjamo automatski fokus sa dugmadi pri otvaranju
-            setTimeout(() => document.activeElement.blur(), 50);
+            setTimeout(() => document.activeElement.blur(), 10);
         }
     });
 } else {
     mainPopup.style.display = "flex";
-    setTimeout(() => document.activeElement.blur(), 50);
+    setTimeout(() => document.activeElement.blur(), 10);
 }
 
-// UNAPREĐENO DUGME "Load" (Sa sinhronizovanim brisanjem keša da radi iz prve)
+// UNAPREĐENO DUGME "Load" (Kao iz starog koda - čisto, bez trzanja i zastoja)
 document.getElementById("loadBtn").addEventListener("click", function(){
     let fileInput = document.createElement("input");
     fileInput.type = "file";
@@ -421,25 +426,23 @@ document.getElementById("loadBtn").addEventListener("click", function(){
             const fileName = file.name ? file.name.toLowerCase() : "";
             if(file.type === "text/html" || file.type === "" || fileName.endsWith(".html") || fileName.endsWith(".htm")){
                 const clearCheckbox = document.getElementById("clearDataCheckbox");
-                const userWantsClear = clearCheckbox && clearCheckbox.checked;
+                const shouldClearData = clearCheckbox && clearCheckbox.checked;
 
-                // Provera da li je aktivan startURL (živi sajt)
-                let isLiveSite = false;
-                if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.loadConfigFileRaw === 'function') {
-                    const rawConfig = window.AndroidBridgeSaver.loadConfigFileRaw();
-                    const match = rawConfig.match(/startURL\s*:\s*["']([^"']+)["']/);
-                    if (match && match[1] && match[1].trim() !== "") {
-                        isLiveSite = true;
-                    }
-                }
-
-                // Brisanje keša sa malom pauzom da se operacija u Androidu završi pre učitavanja novog fajla
-                if (isLiveSite || userWantsClear) {
-                    if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.clearAppCacheAndData === 'function') {
-                        window.AndroidBridgeSaver.clearAppCacheAndData();
-                        // Kratka pauza da WebView sinhronizuje brisanje pre nastavka
-                        await new Promise(resolve => setTimeout(resolve, 250));
-                    }
+                // Ako je korisnik štiklirao opciju, čistimo lokalnu memoriju i keš direktno preko JS-a bez zastoja
+                if (shouldClearData) {
+                    try {
+                        localStorage.clear();
+                        sessionStorage.clear();
+                        document.cookie.split(";").forEach(function(c) { 
+                            document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+                        });
+                        if ('caches' in window) {
+                            const cacheNames = await caches.keys();
+                            for (const name of cacheNames) {
+                                await caches.delete(name);
+                            }
+                        }
+                    } catch(err) {}
                 }
 
                 // Brišemo startURL preko bridge-a
@@ -462,7 +465,7 @@ document.getElementById("loadBtn").addEventListener("click", function(){
                         window.AndroidMenuBridge.closeMenu();
                     }
 
-                    // Osvežavanje glavnog prikaza
+                    // Osvežavanje glavnog prikaza bez trzanja
                     if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.reloadMainApp === 'function') {
                         window.AndroidBridgeSaver.reloadMainApp();
                     } else {
