@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Loader</title>
+
+<!-- Učitavanje konfiguracije -->
+<script src="appConfig.js"></script>
+
+<style>
+:root{
+    --main-background: #070707;
+    --btn-accent: #CBD868;
+    --btn-hover: #A4A25C;
+    --btn-active: #8C7F6F;
+}
+
+/* Back. */
+html, body{
+    margin:0;
+    height:100%;
+    font-family: Inter, Arial, sans-serif;
+    background: var(--main-background);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    overflow:hidden;
+    user-select: none;    
+}
+
+/* Popup */
+.popup{
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: calc(100% - 32px);
+    max-width: 340px;
+    background: #1a1a1c;
+    border-radius: 12px;
+    border: none;
+    padding: 22px 18px 24px 18px;
+    box-shadow: 0 0 0 0.9px #7C874F;
+    box-sizing: border-box;
+    overflow: hidden;
+    word-wrap: break-word;
+    z-index: 1000;
+}
+
+/* Config: manji donji padding da dugmad budu 6px od ivice i veći textarea */
+#configModal {
+    padding-bottom: 20px !important;
+}
+
+/* Config: Produženo polje za tekst nadole */
+#configModal textarea {
+    height: 204px !important;
+}
+
+/* Glavni Popup Header (Load Html) */
+.popup-header {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: -6px;
+    margin-bottom: 55px;
+    width: 100%;
+}
+
+.popup h3{
+    margin: 0;
+    color: #CBD868;
+    font-size: 17px;
+    font-weight: 600;
+    text-align: center;
+}
+
+/* Config Popup Header - mala margina od 6px ispod naslova ka textarea */
+#configModal .popup-header {
+    margin-bottom: 2px !important;
+    margin-top: -10px !important;
+}
+
+#configModal h3 {
+    text-align: left !important;
+    margin-bottom: 6px !important;
+}
+
+/* Točkić uvek u ravni sa naslovom desno */
+.settings-icon-btn {
+    -webkit-tap-highlight-color: transparent;
+    position: absolute;
+    right: 0;
+    background: none;
+    border: none;
+    color: #CBD868;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.15s;
+    outline: none;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.settings-icon-btn:hover {
+    background: rgba(203, 216, 104, 0.1);
+}
+
+.settings-icon-btn svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+}
+
+/* Checkbox container */
+.checkbox-row {
+    -webkit-tap-highlight-color: transparent;
+    appearance: none;
+    margin: 12px 0 0px 4px;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    color: #DADADA;
+    font-size: 14px;
+    text-align: left;
+    min-height: 22px;
+}
+
+.checkbox-row label {
+    color: #DADADA;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    user-select: none;
+    text-align: left;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Custom Checkbox - Uklonjen plavi hover/tap efekat pretraživača */
+.checkbox-row label input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    background-color: #262822; 
+    border: 1.5px solid #555b35;
+    border-radius: 4px;
+    cursor: pointer;
+    outline: none;
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: filter 0.15s, background-color 0.15s, border-color 0.15s;
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+    box-sizing: border-box;
+}
+
+/* Inside Tick */
+.checkbox-row label input[type="checkbox"]::after {
+    content: "";
+    width: 3px;
+    height: 8px;
+    border: solid #555;
+    border-width: 0 2px 2px 0;
+    transform: rotate(40deg) scale(0);
+    transition: transform 0.15s ease-in-out;
+    position: relative;
+    top: -1px;
+    filter: brightness(0); 
+}
+
+/* Checked state */
+.checkbox-row label input[type="checkbox"]:checked {
+    background-color: var(--btn-accent);
+    border-color: var(--btn-accent);
+}
+
+.checkbox-row label input[type="checkbox"]:checked::after {
+    transform: rotate(40deg) scale(1);
+}
+
+/* Checkbox - hover & click */
+@media (hover: hover) and (pointer: fine) {
+    .checkbox-row label input[type="checkbox"]:hover {
+        filter: brightness(1.25);
+    }
+}
+
+.checkbox-row label input[type="checkbox"]:active {
+    filter: brightness(1.25);
+    background-color: var(--btn-accent);
+}
+
+/* Butn. row */
+.row{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 16px;
+    margin-bottom: -4px;  /* pading ispod dugmica - glavni prozor */
+}
+
+/* Butn. in popup */
+.row button{
+    flex: 1 1 0;
+    width: 0;
+    min-width: 30%;
+    max-width: 60%;
+    box-sizing: border-box;
+    padding: 11px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    background-color: var(--btn-accent) !important;
+    color: #555 !important;
+    margin-top: 6px;  /* pading iznad dugmica - config prozor */
+    transition: filter 0.15s, background 0.15s;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    appearance: none;
+}
+
+/* Hover */
+@media (hover: hover) and (pointer: fine) {
+    .row button:hover{
+        filter: brightness(1.25);
+        box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+    }
+}
+
+/* Click */
+.row button:active{
+    filter: brightness(1.25);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+}
+
+/* Mask text */
+.mask-text{
+    color: #555;
+    filter: brightness(0);
+}
+
+.row button:focus{
+    outline: none;
+}
+
+.hidden-file-input {
+    display: none;
+}
+</style>
+</head>
+<body>
+
+<!-- GLAVNI POPUP -->
+<div class="popup" id="mainPopup">
+    <div class="popup-header">
+        <h3 id="popupTitle">Load Html</h3>
+        <button id="openConfigBtn" class="settings-icon-btn" title="Edit config">
+            <svg viewBox="0 0 24 24">
+                <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l-.06-.06a2 2 0 0 1 2.83 2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>
+            </svg>
+        </button>
+    </div>
+    
+    <div id="checkboxContainer" class="checkbox-row">
+        <label>
+            <input type="checkbox" id="clearDataCheckbox">
+            <span>Clear local cache and data</span>
+        </label>
+    </div>
+    
+    <div class="row">
+        <button id="loadBtn"><span class="mask-text">Load</span></button>
+        <button id="exitBtn"><span class="mask-text">Close</span></button>
+    </div>
+    
+    <input type="file" id="fileInput" class="hidden-file-input" accept=".html,.htm" />
+</div>
+
+<!-- EDITOR MODAL (CONFIG) -->
+<div class="popup" id="configModal">
+    <div class="popup-header">
+        <h3>Config..</h3>
+    </div>
+    <textarea id="configTextArea" style="width:100%; height:204px; background:#111; color:#CBD868; border:1.5px solid #555b35; border-radius:8px; padding:10px; font-family:monospace; font-size:12px; box-sizing:border-box; outline:none; resize:none;"></textarea>
+    <div class="row" style="margin-top:10px;">
+        <button id="saveConfigBtn"><span class="mask-text">Save</span></button>
+        <button id="closeConfigBtn"><span class="mask-text">Close</span></button>
+    </div>
+</div>
+
+<script>
+const DB_NAME = "LDR_DB";
+const STORE_NAME = "apps";
+
+function openDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, 1);
+        request.onupgradeneeded = function(e) {
+            e.target.result.createObjectStore(STORE_NAME);
+        };
+        request.onsuccess = function(e) { resolve(e.target.result); };
+        request.onerror = function() { reject("IndexedDB error"); };
+    });
+}
+
+async function saveApp(htmlContent, fileName = "app.html"){
+    const db = await openDB();
+    return new Promise((resolve) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        store.put(htmlContent, "userApp");
+        store.put(fileName, "userAppName");
+        tx.oncomplete = () => resolve();
+    });
+}
+
+async function getSavedApp(){
+    const db = await openDB();
+    return new Promise(resolve => {
+        const tx = db.transaction(STORE_NAME, "readonly");
+        const store = tx.objectStore(STORE_NAME);
+        const reqApp = store.get("userApp");
+        const reqName = store.get("userAppName");
+        
+        let result = {};
+        reqApp.onsuccess = () => {
+            result.content = reqApp.result;
+            if (result.content !== undefined && result.name !== undefined) resolve(result);
+        };
+        reqName.onsuccess = () => {
+            result.name = reqName.result;
+            if (result.content !== undefined && result.name !== undefined) resolve(result);
+        };
+        setTimeout(() => resolve(null), 350);
+    });
+}
+
+async function saveSetting(key, value){
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const store = tx.objectStore(STORE_NAME);
+    store.put(value, key);
+}
+
+async function getSetting(key){
+    const db = await openDB();
+    return new Promise(resolve => {
+        const tx = db.transaction(STORE_NAME, "readonly");
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.get(key);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => resolve(undefined);
+    });
+}
+
+async function initPreferences() {
+    const clearCheckbox = document.getElementById("clearDataCheckbox");
+    if (!clearCheckbox) return;
+    const savedState = await getSetting("clearCachePreference");
+    clearCheckbox.checked = (savedState === undefined || savedState === null) ? false : savedState;
+
+    clearCheckbox.addEventListener("change", function() {
+        saveSetting("clearCachePreference", clearCheckbox.checked);
+    });
+}
+
+const configModal = document.getElementById("configModal");
+const mainPopup = document.getElementById("mainPopup");
+const configTextArea = document.getElementById("configTextArea");
+
+document.getElementById("openConfigBtn").addEventListener("click", () => {
+    mainPopup.style.display = "none";
+    if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.loadConfigFileRaw === 'function') {
+        configTextArea.value = window.AndroidBridgeSaver.loadConfigFileRaw();
+    } else {
+        configTextArea.value = "// Bridge not available";
+    }
+    configModal.style.display = "flex";
+});
+
+document.getElementById("closeConfigBtn").addEventListener("click", () => {
+    configModal.style.display = "none";
+    mainPopup.style.display = "flex";
+});
+
+document.getElementById("saveConfigBtn").addEventListener("click", () => {
+    if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.saveConfigFile === 'function') {
+        window.AndroidBridgeSaver.saveConfigFile(configTextArea.value);
+        window.AndroidBridgeSaver.restartApp();
+    } else {
+        alert("Bridge not available!");
+    }
+});
+
+// Funkcija za učitavanje sačuvane aplikacije
+async function loadApp(htmlContent, fileName = ""){
+    mainPopup.style.display = "none";
+
+    const customPopupScript = `
+    <script>
+    (function() {
+        const container = document.createElement("div");
+        container.id = "injectedPopupContainer";
+        document.body.appendChild(container);
+        const shadow = container.attachShadow({ mode: "open" });
+
+        shadow.innerHTML = \`
+        <style>
+            :root{
+                --main-background: #070707;
+                --btn-accent: #CBD868;
+                --btn-hover: #A4A25C;
+                --btn-active: #8C7F6F;
+            }
+            button, input {
+                -webkit-tap-highlight-color: transparent;
+            }
+            button:focus, button:active, input:focus {
+                outline: none;
+            }
+            .popup {
+                display: none;
+                flex-direction: column;
+                align-items: stretch;
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: calc(100% - 32px);
+                max-width: 340px;
+                background: #1a1a1c;
+                border-radius: 12px;
+                border: none;
+                padding: 22px 18px 24px 18px;
+                box-shadow: 0 0 0 0.9px #7C874F;
+                box-sizing: border-box;
+                z-index: 2147483647;
+                font-family: Inter, Arial, sans-serif;
+                user-select: none;
+            }
+
+            /* Config: manji donji padding da dugmad budu 6px od ivice i veći textarea */
+            #configModal {
+                padding-bottom: 20px !important;
+            }
+
+            /* Config: Produženo polje za tekst nadole */
+            #configModal textarea {
+                height: 204px !important;
+            }
+
+            /* Glavni Popup Header (Load Html) */
+            .popup-header {
+                position: relative;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-top: -6px;
+                margin-bottom: 55px;
+                width: 100%;
+            }
+
+            .popup h3{
+                margin: 0;
+                color: #CBD868;
+                font-size: 17px;
+                font-weight: 600;
+                text-align: center;
+            }
+
+            /* Config Popup Header - mala margina od 6px ispod naslova ka textarea */
+            #configModal .popup-header {
+                margin-bottom: 2px !important;
+                margin-top: -10px !important;
+            }
+
+            #configModal h3 {
+                text-align: left !important;
+                margin-bottom: 6px !important;
+            }
+
+            /* Točkić uvek u ravni sa naslovom desno */
+            .settings-icon-btn {
+                -webkit-tap-highlight-color: transparent;
+                position: absolute;
+                right: 0;
+                background: none;
+                border: none;
+                color: #CBD868;
+                cursor: pointer;
+                border-radius: 6px;
+                transition: background 0.15s;
+                outline: none;
+                width: 30px;
+                height: 30px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .settings-icon-btn:hover {
+                background: rgba(203, 216, 104, 0.1);
+            }
+
+            .settings-icon-btn svg {
+                width: 18px;
+                height: 18px;
+                stroke: currentColor;
+                stroke-width: 2;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+                fill: none;
+            }
+
+            /* Checkbox container */
+            .checkbox-row {
+                margin: 12px 0 0px 4px;
+                display: flex;
+                justify-content: flex-start;
+                align-items: center;
+                color: #DADADA;
+                font-size: 14px;
+                text-align: left;
+                min-height: 22px;
+            }
+
+            .checkbox-row label {
+                color: #DADADA;
+                font-size: 14px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 11px;
+                user-select: none;
+                text-align: left;
+                -webkit-tap-highlight-color: transparent;
+            }
+
+            /* Custom Checkbox - Uklonjen plavi hover/tap efekat pretraživača */
+            .checkbox-row label input[type="checkbox"] {
+                appearance: none;
+                -webkit-appearance: none;
+                width: 16px;
+                height: 16px;
+                background-color: #262822; 
+                border: 1.5px solid #555b35;
+                border-radius: 4px;
+                cursor: pointer;
+                outline: none;
+                margin: 0;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                transition: filter 0.15s, background-color 0.15s, border-color 0.15s;
+                position: relative;
+                -webkit-tap-highlight-color: transparent;
+                box-sizing: border-box;
+                flex-shrink: 0;
+            }
+
+            /* Inside Tick */
+            .checkbox-row label input[type="checkbox"]::after {
+                content: "";
+                width: 3px;
+                height: 8px;
+                border: solid #555;
+                border-width: 0 2px 2px 0;
+                transform: rotate(40deg) scale(0);
+                transition: transform 0.15s ease-in-out;
+                position: relative;
+                top: -1px;
+                filter: brightness(0); 
+            }
+
+            /* Checked state */
+            .checkbox-row label input[type="checkbox"]:checked {
+                background-color: var(--btn-accent);
+                border-color: var(--btn-accent);
+            }
+
+            .checkbox-row label input[type="checkbox"]:checked::after {
+                transform: rotate(40deg) scale(1);
+            }
+
+            /* Checkbox - hover & click */
+            @media (hover: hover) and (pointer: fine) {
+                .checkbox-row label input[type="checkbox"]:hover {
+                    filter: brightness(1.25);
+                }
+            }
+
+            .checkbox-row label input[type="checkbox"]:active {
+                filter: brightness(1.25);
+                background-color: var(--btn-accent);
+            }
+
+            /* Butn. row */
+            .row{
+                display: flex;
+                flex-wrap: wrap;
+                gap: 12px;
+                justify-content: center;
+                margin-top: 16px;
+                margin-bottom: -4px;  /* pading ispod dugmica - glavni prozor */
+            }
+
+            /* Butn. in popup */
+            .row button{
+                flex: 1 1 0;
+                width: 0;
+                min-width: 30%;
+                max-width: 60%;
+                box-sizing: border-box;
+                padding: 11px;
+                border-radius: 10px;
+                border: none;
+                cursor: pointer;
+                font-weight: 600;
+                background-color: var(--btn-accent) !important;
+                color: #555 !important;
+                margin-top: 6px;  /* pading iznad dugmica - config prozor */
+                transition: filter 0.15s, background 0.15s;
+                outline: none;
+                -webkit-tap-highlight-color: transparent;
+                appearance: none;
+            }
+
+            /* Hover */
+            @media (hover: hover) and (pointer: fine) {
+                .row button:hover{
+                    filter: brightness(1.25);
+                    box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+                }
+            }
+
+            /* Click */
+            .row button:active{
+                filter: brightness(1.25);
+                box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+            }
+
+            /* Mask text */
+            .mask-text{
+                color: #555;
+                filter: brightness(0);
+            }
+
+            .row button:focus{
+                outline: none;
+            }
+        </style>
+
+        <div id="injectedPopup" class="popup">
+            <div class="popup-header">
+                <h3>Load Html</h3>
+                <button id="injOpenConfigBtn" class="settings-icon-btn" title="Edit config">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l-.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l-.06-.06a2 2 0 0 1 2.83 2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="checkbox-row">
+                <label>
+                    <input type="checkbox" id="injectedClearDataCheckbox">
+                    <span>Clear local cache and data</span>
+                </label>
+            </div>
+            <div class="row">
+                <button id="injectedLoadBtn"><span class="mask-text">Load</span></button>
+                <button id="injectedCancelBtn"><span class="mask-text">Close</span></button>
+            </div>
+        </div>
+
+        <div id="configModal" class="popup">
+            <div class="popup-header">
+                <h3>Config..</h3>
+            </div>
+            <textarea id="injConfigTextArea" style="width:100%; height:204px; background:#111; color:#CBD868; border:1.5px solid #555b35; border-radius:8px; padding:10px; font-family:monospace; font-size:12px; box-sizing:border-box; outline:none; resize:none;"></textarea>
+            <div class="row" style="margin-top:10px;">
+                <button id="injSaveConfigBtn"><span class="mask-text">Save</span></button>
+                <button id="injCloseConfigBtn"><span class="mask-text">Close</span></button>
+            </div>
+        </div>
+        \`;
+
+        let tapCount = 0;
+        let tapTimeout = null;
+        const popup = shadow.getElementById("injectedPopup");
+        const configModal = shadow.getElementById("configModal");
+        const clearCheckbox = shadow.getElementById("injectedClearDataCheckbox");
+        const textArea = shadow.getElementById("injConfigTextArea");
+
+        const DB_NAME = "LDR_DB";
+        const STORE_NAME = "apps";
+
+        const requestPref = indexedDB.open(DB_NAME, 1);
+        requestPref.onsuccess = function(e) {
+            const db = e.target.result;
+            if (db.objectStoreNames.contains(STORE_NAME)) {
+                const tx = db.transaction(STORE_NAME, "readonly");
+                const store = tx.objectStore(STORE_NAME);
+                const req = store.get("clearCachePreference");
+                req.onsuccess = function() {
+                    if (req.result !== undefined && req.result !== null) {
+                        clearCheckbox.checked = req.result;
+                    }
+                };
+            }
+        };
+
+        clearCheckbox.addEventListener("change", function() {
+            const reqDB = indexedDB.open(DB_NAME, 1);
+            reqDB.onsuccess = function(e) {
+                const db = e.target.result;
+                const tx = db.transaction(STORE_NAME, "readwrite");
+                const store = tx.objectStore(STORE_NAME);
+                store.put(clearCheckbox.checked, "clearCachePreference");
+            };
+        });
+
+        shadow.getElementById("injOpenConfigBtn").addEventListener("click", function() {
+            popup.style.display = "none";
+            if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.loadConfigFileRaw === 'function') {
+                textArea.value = window.AndroidBridgeSaver.loadConfigFileRaw();
+            } else {
+                textArea.value = "// Bridge not available";
+            }
+            configModal.style.display = "flex";
+        });
+
+        shadow.getElementById("injCloseConfigBtn").addEventListener("click", function() {
+            configModal.style.display = "none";
+            popup.style.display = "flex";
+        });
+
+        shadow.getElementById("injSaveConfigBtn").addEventListener("click", function() {
+            if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.saveConfigFile === 'function') {
+                window.AndroidBridgeSaver.saveConfigFile(textArea.value);
+                window.AndroidBridgeSaver.restartApp();
+            } else {
+                alert("Bridge not available!");
+            }
+        });
+
+        document.addEventListener("touchstart", function(e) {
+            if (popup.style.display === "flex" || configModal.style.display === "flex") return;
+            if (e.touches.length > 1) { tapCount = 0; return; }
+            tapCount++;
+            if (tapTimeout) clearTimeout(tapTimeout);
+            if (tapCount >= 6) {
+                tapCount = 0;
+                configModal.style.display = "none";
+                popup.style.display = "flex";
+            } else {
+                tapTimeout = setTimeout(() => { tapCount = 0; }, 350);
+            }
+        }, { capture: true, passive: true });
+
+        shadow.getElementById("injectedCancelBtn").addEventListener("click", function() {
+            popup.style.display = "none";
+        });
+
+        shadow.getElementById("injectedLoadBtn").addEventListener("click", function() {
+            let fileInput = document.createElement("input");
+            fileInput.type = "file";
+            fileInput.accept = ".html,.htm";
+            fileInput.style.display = "none";
+            document.body.appendChild(fileInput);
+
+            fileInput.addEventListener("change", async function(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    const fileName = file.name ? file.name.toLowerCase() : "";
+                    if (file.type === "text/html" || file.type === "" || fileName.endsWith(".html") || fileName.endsWith(".htm")) {
+                        const reader = new FileReader();
+                        reader.onload = async function(e2) {
+                            const htmlContent = e2.target.result;
+
+                            if (clearCheckbox.checked) {
+                                try {
+                                    localStorage.clear();
+                                    sessionStorage.clear();
+                                    if ('caches' in window) {
+                                        const cacheNames = await caches.keys();
+                                        for (const name of cacheNames) { await caches.delete(name); }
+                                    }
+                                } catch(err) {}
+                            }
+
+                            const reqDB = indexedDB.open(DB_NAME, 1);
+                            reqDB.onsuccess = function(e3) {
+                                const db = e3.target.result;
+                                const tx = db.transaction(STORE_NAME, "readwrite");
+                                const store = tx.objectStore(STORE_NAME);
+                                store.put(htmlContent, "userApp");
+                                store.put(fileName, "userAppName");
+                                tx.oncomplete = function() { location.reload(); };
+                            };
+                        };
+                        reader.readAsText(file);
+                    }
+                }
+            });
+            fileInput.click();
+        });
+    })();
+    <\/script>
+    `;
+
+    let modifiedHtml = htmlContent;
+    const bodyRegex = /<\/body>/i;
+    if (bodyRegex.test(modifiedHtml)) {
+        modifiedHtml = modifiedHtml.replace(bodyRegex, customPopupScript + "</body>");
+    } else {
+        modifiedHtml += customPopupScript;
+    }
+
+    document.open();
+    document.write(modifiedHtml);
+    document.close();
+}
+
+// Pokretanje pri startu aplikacije
+getSavedApp().then(saved => {
+    initPreferences();
+    if(saved && saved.content){
+        loadApp(saved.content, saved.name || "");
+    } else {
+        mainPopup.style.display = "flex";
+    }
+});
+
+document.getElementById("loadBtn").addEventListener("click", function(){
+    document.getElementById("fileInput").click();
+});
+
+document.getElementById("fileInput").addEventListener("change", function(event){
+    const file = event.target.files[0];
+    if(file){
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            const htmlContent = e.target.result;
+            const clearCheckbox = document.getElementById("clearDataCheckbox");
+            if (clearCheckbox && clearCheckbox.checked) {
+                try {
+                    localStorage.clear();
+                    sessionStorage.clear();
+                } catch(err) {}
+            }
+            await saveApp(htmlContent, file.name);
+            loadApp(htmlContent, file.name);
+        };
+        reader.readAsText(file);
+    }
+});
+
+document.getElementById("exitBtn").addEventListener("click", function(){
+    window.close();
+});
+</script>
+</body>
+</html>
