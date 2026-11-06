@@ -630,6 +630,7 @@ public class MainActivity extends AppCompatActivity {
                     MainActivity act = (MainActivity) mContext;
                     if (act.webView != null) {
                         act.webView.loadUrl("file:///android_asset/menu.html");
+                        act.webView.clearHistory(); // Briše samo istoriju kretanja (da Back ne vrati sajt), ali NE dira IndexedDB i LocalStorage osim ako je checkbox štikliran!
                     }
                 });
             }
