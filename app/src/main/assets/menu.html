@@ -505,26 +505,21 @@ document.getElementById("loadBtn").addEventListener("click", function(){
 document.getElementById("exitBtn").addEventListener("click", function(){
     clearAllFocus();
 
-    // Proveravamo da li je ovo prvo pokretanje (nema sačuvane aplikacije i prikazan je glavni meni)
-    getSavedApp().then(saved => {
-        const hasApp = saved && saved.content;
-        
-        if (!hasApp) {
-            // Ako nema učitane aplikacije, potpuno gasimo Android aplikaciju
-            if (window.AndroidMenuBridge && typeof window.AndroidMenuBridge.exitApp === 'function') {
-                window.AndroidMenuBridge.exitApp();
-            } else {
-                window.close();
-            }
+    // Ako nismo u overlay modu (značii ovo je početni ekran kad ništa nije učitano)
+    if (!isMenuOverlay) {
+        if (window.AndroidMenuBridge && typeof window.AndroidMenuBridge.exitApp === 'function') {
+            window.AndroidMenuBridge.exitApp();
         } else {
-            // Ako aplikacija postoji, samo zatvaramo overlay meni
-            if (window.AndroidMenuBridge && typeof window.AndroidMenuBridge.closeMenu === 'function') {
-                window.AndroidMenuBridge.closeMenu();
-            } else {
-                window.close();
-            }
+            window.close();
         }
-    });
+    } else {
+        // Ako je ovo overlay meni unutar već pokrenute aplikacije
+        if (window.AndroidMenuBridge && typeof window.AndroidMenuBridge.closeMenu === 'function') {
+            window.AndroidMenuBridge.closeMenu();
+        } else {
+            window.close();
+        }
+    }
 });
 </script>
 </body>
