@@ -524,8 +524,8 @@ public class MainActivity extends AppCompatActivity {
             externalDomains = parseArray(jsContent, "external");
 
         } catch (Exception e) {
-            copyAssetToFile("appConfig.js", configFile);
-            loadConfigFromInternalStorage();
+            //copyAssetToFile("appConfig.js", configFile);
+            //loadConfigFromInternalStorage();
         }
     }
 
