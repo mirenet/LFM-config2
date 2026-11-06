@@ -295,6 +295,17 @@ async function saveApp(htmlContent, fileName = "app.html"){
     });
 }
 
+async function clearSavedApp(){
+    const db = await openDB();
+    return new Promise((resolve) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        store.delete("userApp");
+        store.delete("userAppName");
+        tx.oncomplete = () => resolve();
+    });
+}
+
 async function getSavedApp(){
     const db = await openDB();
     return new Promise(resolve => {
@@ -375,7 +386,7 @@ document.getElementById("saveConfigBtn").addEventListener("click", () => {
 
 initPreferences();
 
-// INICIJALIZACIJA BEZ BLESKA: Provera pre nego što se meni uopšte pojavi na ekranu
+// INICIJALIZACIJA BEZ BLESKA
 const urlParams = new URLSearchParams(window.location.search);
 const isMenuOverlay = urlParams.get('menu') === 'true';
 
@@ -390,38 +401,70 @@ if (!isMenuOverlay) {
         }
     });
 } else {
-    // Ako je ovo gornji overlay meni, uvek prikaži popup
     mainPopup.style.display = "flex";
 }
 
-document.getElementById("loadBtn").addEventListener("click", function(){
+// 1, 2, 3 KORAK KADA SE KLIKNE "Load" DUGME:
+document.getElementById("loadBtn").addEventListener("click", async function(){
+    const clearCheckbox = document.getElementById("clearDataCheckbox");
+    const userWantsClear = clearCheckbox && clearCheckbox.checked;
+
+    // Proveravamo da li je u appConfig.js trenutno aktivan startURL (živi sajt)
+    let isLiveSite = false;
+    if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.loadConfigFileRaw === 'function') {
+        const rawConfig = window.AndroidBridgeSaver.loadConfigFileRaw();
+        const match = rawConfig.match(/startURL\s*:\s*["']([^"']+)["']/);
+        if (match && match[1] && match[1].trim() !== "") {
+            isLiveSite = true;
+        }
+    }
+
+    // Keš i kolačići se brišu SAMO ako smo bili na živom sajtu ILI ako je korisnik ručno štiklirao "Clear local cache"
+    if (isLiveSite || userWantsClear) {
+        try {
+            localStorage.clear();
+            sessionStorage.clear();
+            document.cookie.split(";").forEach(function(c) { 
+                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+            });
+            if ('caches' in window) {
+                const cacheNames = await caches.keys();
+                for (const name of cacheNames) {
+                    await caches.delete(name);
+                }
+            }
+        } catch(err) {}
+    }
+
+    // Korak 1: Briše startURL na prazno preko bridge-a
+    if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.clearStartUrl === 'function') {
+        window.AndroidBridgeSaver.clearStartUrl();
+    }
+
+    // Korak 2: Brišemo staru aplikaciju iz baze
+    await clearSavedApp();
+
+    // Korak 3: Otvara File explorer
     document.getElementById("fileInput").click();
 });
 
-document.getElementById("fileInput").addEventListener("change", function(event){
+// Korak 4: Čitanje fajla, snimanje i restart bez iskakanja menija
+document.getElementById("fileInput").addEventListener("change", async function(event){
     const file = event.target.files[0];
     if(file){
         const reader = new FileReader();
         reader.onload = async function(e) {
             const htmlContent = e.target.result;
-            const clearCheckbox = document.getElementById("clearDataCheckbox");
-            if (clearCheckbox && clearCheckbox.checked) {
-                try {
-                    localStorage.clear();
-                    sessionStorage.clear();
-                } catch(err) {}
-            }
-            await saveApp(htmlContent, file.name);
             
-            // BRIŠEMO startURL IZ appConfig.js KAD SE UVEZE HTML FAJL!
-            if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.clearStartUrl === 'function') {
-                window.AndroidBridgeSaver.clearStartUrl();
-            }
+            // Snimamo novi HTML u bazu
+            await saveApp(htmlContent, file.name);
 
+            // Zatvaramo gornji overlay meni ako je bio otvoren preko 6 tapa
             if (window.AndroidMenuBridge && typeof window.AndroidMenuBridge.closeMenu === 'function') {
                 window.AndroidMenuBridge.closeMenu();
             }
 
+            // Restartujemo aplikaciju da se primeni novi HTML direktno bez prikazivanja menija
             if (window.AndroidBridgeSaver && typeof window.AndroidBridgeSaver.restartApp === 'function') {
                 window.AndroidBridgeSaver.restartApp();
             } else {
